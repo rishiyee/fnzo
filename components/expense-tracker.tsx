@@ -1,221 +1,205 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { ExpenseTable } from "./expense-table"
-import { ExpenseSummary } from "./expense-summary"
-import { UnifiedFilter } from "./unified-filter"
-import { CSVImportExport } from "./csv-import-export"
-import { ExpenseSummarySkeleton } from "./skeleton/expense-summary-skeleton"
-import { ExpenseTableSkeleton } from "./skeleton/expense-table-skeleton"
-import type { Expense } from "@/types/expense"
-import { expenseService } from "@/lib/expense-service"
-import { useFilter } from "@/contexts/filter-context"
-import { useToast } from "@/hooks/use-toast"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AlertCircle, RefreshCcw } from "lucide-react"
+import { useState, useEffect } from "react"
+import { format } from "date-fns"
+import { Edit, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Badge } from "@/components/ui/badge"
+import { ExpenseForm } from "@/components/expense-form"
+import { ExpenseTableSkeleton } from "@/components/skeleton/expense-table-skeleton"
+import type { Expense } from "@/types/expense"
 
 interface ExpenseTrackerProps {
-  onExpensesUpdated?: (expenses: Expense[]) => void
-  onAddTransaction?: (callback: (expense: Expense) => void) => void
+  expenses: Expense[]
+  isLoading?: boolean
+  onUpdate?: (expense: Expense) => void
+  onDelete?: (id: string) => void
+  onAddTransaction?: ((callback: (expense: Expense) => void) => void) | null
+  limit?: number
 }
 
-export default function ExpenseTracker({ onExpensesUpdated, onAddTransaction }: ExpenseTrackerProps) {
-  const [expenses, setExpenses] = useState<Expense[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [sortConfig, setSortConfig] = useState<{
-    key: keyof Expense
-    direction: "ascending" | "descending"
-  } | null>(null)
-  const { toast } = useToast()
-  const { applyFilters } = useFilter()
+export function ExpenseTracker({
+  expenses,
+  isLoading = false,
+  onUpdate,
+  onDelete,
+  onAddTransaction,
+  limit,
+}: ExpenseTrackerProps) {
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null)
 
-  // Load expenses from Supabase
-  const loadExpenses = async () => {
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      // Verify authentication first
-      const isAuthenticated = await expenseService.verifyAuthentication()
-      if (!isAuthenticated) {
-        setError("Authentication failed. Please sign in again.")
-        return
-      }
-
-      console.log("Loading expenses...")
-      const data = await expenseService.getExpenses()
-      console.log("Expenses loaded:", data.length)
-      setExpenses(data)
-    } catch (error: any) {
-      console.error("Failed to load expenses:", error)
-
-      // Check if it's an auth error
-      if (
-        error.message?.includes("auth") ||
-        error.message?.includes("JWT") ||
-        error.message?.includes("token") ||
-        error.code === "PGRST301"
-      ) {
-        setError("Authentication error. Please sign in again.")
-      } else {
-        setError(error?.message || "Failed to load expenses. Please try again.")
-      }
-
-      toast({
-        title: "Error",
-        description: error?.message || "Failed to load expenses. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // Effect to notify parent when expenses change
-  useEffect(() => {
-    if (onExpensesUpdated && !isLoading && expenses.length > 0) {
-      onExpensesUpdated(expenses)
-    }
-  }, [expenses, isLoading, onExpensesUpdated])
-
-  // Callback for when a new transaction is added
-  const handleTransactionAdded = useCallback((newExpense: Expense) => {
-    console.log("New transaction added:", newExpense)
-
-    // Add the new expense to the expenses array
-    setExpenses((prevExpenses) => {
-      return [newExpense, ...prevExpenses]
-    })
-  }, [])
-
-  // Register the callback with the parent component
+  // Register the callback for adding transactions
   useEffect(() => {
     if (onAddTransaction) {
-      onAddTransaction(handleTransactionAdded)
+      onAddTransaction((expense: Expense) => {
+        // This callback will be called when a transaction is added
+        console.log("Transaction added:", expense)
+      })
     }
-  }, [onAddTransaction, handleTransactionAdded])
+  }, [onAddTransaction])
 
-  useEffect(() => {
-    loadExpenses()
-  }, [])
+  const handleEditClick = (expense: Expense) => {
+    setEditingExpense(expense)
+    setIsEditDialogOpen(true)
+  }
 
-  const updateExpense = async (updatedExpense: Expense) => {
-    try {
-      const expense = await expenseService.updateExpense(updatedExpense)
-      const updatedExpenses = expenses.map((item) => (item.id === expense.id ? expense : item))
-      setExpenses(updatedExpenses)
+  const handleDeleteClick = (id: string) => {
+    setExpenseToDelete(id)
+    setDeleteConfirmOpen(true)
+  }
 
-      toast({
-        title: "Success",
-        description: "Transaction updated successfully",
-      })
-    } catch (error: any) {
-      console.error("Failed to update transaction:", error)
-      toast({
-        title: "Error",
-        description: error?.message || "Failed to update transaction. Please try again.",
-        variant: "destructive",
-      })
+  const handleConfirmDelete = async () => {
+    if (expenseToDelete && onDelete) {
+      onDelete(expenseToDelete)
+      setDeleteConfirmOpen(false)
+      setExpenseToDelete(null)
     }
   }
 
-  const deleteExpense = async (id: string) => {
-    try {
-      await expenseService.deleteExpense(id)
-      const updatedExpenses = expenses.filter((expense) => expense.id !== id)
-      setExpenses(updatedExpenses)
-
-      toast({
-        title: "Success",
-        description: "Transaction deleted successfully",
-      })
-    } catch (error: any) {
-      console.error("Failed to delete transaction:", error)
-      toast({
-        title: "Error",
-        description: error?.message || "Failed to delete transaction. Please try again.",
-        variant: "destructive",
-      })
+  const getTypeColor = (type: string) => {
+    switch (type) {
+      case "expense":
+        return "destructive"
+      case "income":
+        return "success"
+      case "savings":
+        return "blue"
+      default:
+        return "secondary"
     }
   }
 
-  const handleSort = (key: keyof Expense) => {
-    let direction: "ascending" | "descending" = "ascending"
-
-    if (sortConfig && sortConfig.key === key && sortConfig.direction === "ascending") {
-      direction = "descending"
-    }
-
-    setSortConfig({ key, direction })
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 0,
+    }).format(amount)
   }
 
-  // Get filtered expenses
-  const filteredExpenses = applyFilters(expenses)
+  // Limit the number of expenses to display
+  const displayedExpenses = limit ? expenses.slice(0, limit) : expenses
 
-  // Apply sorting to filtered expenses
-  const sortedFilteredExpenses = [...filteredExpenses].sort((a, b) => {
-    if (!sortConfig) return 0
+  if (isLoading) {
+    return <ExpenseTableSkeleton />
+  }
 
-    if (a[sortConfig.key] < b[sortConfig.key]) {
-      return sortConfig.direction === "ascending" ? -1 : 1
-    }
-    if (a[sortConfig.key] > b[sortConfig.key]) {
-      return sortConfig.direction === "ascending" ? 1 : -1
-    }
-    return 0
-  })
-
-  if (error) {
+  if (expenses.length === 0) {
     return (
-      <div className="space-y-4">
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-        <div className="flex justify-center">
-          <Button onClick={loadExpenses} className="flex items-center gap-2">
-            <RefreshCcw className="h-4 w-4" />
-            Try Again
-          </Button>
-        </div>
+      <div className="text-center py-12 w-full">
+        <h3 className="text-lg font-medium">No transactions found</h3>
+        <p className="text-muted-foreground mt-1">Add a transaction to get started</p>
       </div>
     )
   }
 
   return (
-    <div className="space-y-8">
-      {isLoading ? <ExpenseSummarySkeleton /> : <ExpenseSummary expenses={filteredExpenses} />}
-
-      <div className="space-y-4">
-        <UnifiedFilter />
-
-        <div className="flex justify-between items-center">
-          <div className="text-sm text-muted-foreground">
-            {filteredExpenses.length} {filteredExpenses.length === 1 ? "transaction" : "transactions"} found
+    <div className="w-full">
+      <div className="divide-y w-full">
+        {displayedExpenses.map((expense) => (
+          <div key={expense.id} className="flex items-center justify-between py-4 px-6 w-full">
+            <div className="flex items-start gap-3 w-full">
+              <div
+                className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                  expense.type === "expense"
+                    ? "bg-red-100 text-red-600"
+                    : expense.type === "income"
+                      ? "bg-green-100 text-green-600"
+                      : "bg-blue-100 text-blue-600"
+                }`}
+              >
+                {expense.type === "expense" ? "-" : "+"}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between w-full">
+                  <h4 className="font-medium truncate">{expense.category}</h4>
+                  <span className="font-bold">{formatCurrency(expense.amount)}</span>
+                </div>
+                <div className="flex items-center justify-between mt-1 w-full">
+                  <div className="flex items-center gap-2">
+                    <Badge variant={getTypeColor(expense.type)}>
+                      {expense.type.charAt(0).toUpperCase() + expense.type.slice(1)}
+                    </Badge>
+                    <span className="text-sm text-muted-foreground">
+                      {format(new Date(expense.date), "dd MMM yyyy")}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {onUpdate && (
+                      <Button variant="ghost" size="icon" onClick={() => handleEditClick(expense)}>
+                        <Edit className="h-4 w-4" />
+                        <span className="sr-only">Edit</span>
+                      </Button>
+                    )}
+                    {onDelete && (
+                      <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(expense.id)}>
+                        <Trash2 className="h-4 w-4" />
+                        <span className="sr-only">Delete</span>
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                {expense.notes && <p className="text-sm text-muted-foreground mt-1 truncate">{expense.notes}</p>}
+              </div>
+            </div>
           </div>
-        </div>
+        ))}
       </div>
 
-      {isLoading ? (
-        <ExpenseTableSkeleton />
-      ) : (
-        <ExpenseTable
-          expenses={sortedFilteredExpenses}
-          onUpdate={updateExpense}
-          onDelete={deleteExpense}
-          onSort={handleSort}
-          sortConfig={sortConfig}
-          isLoading={false}
-        />
+      {/* Edit Dialog */}
+      {onUpdate && (
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Edit Transaction</DialogTitle>
+            </DialogHeader>
+            {editingExpense && (
+              <ExpenseForm
+                initialData={editingExpense}
+                onSubmit={async (data) => {
+                  onUpdate({ ...editingExpense, ...data })
+                  setIsEditDialogOpen(false)
+                }}
+                onCancel={() => setIsEditDialogOpen(false)}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
       )}
 
-      {/* Hidden component to handle import dialog */}
-      <div className="hidden">
-        <CSVImportExport expenses={expenses} onImportComplete={loadExpenses} />
-      </div>
+      {/* Delete Confirmation Dialog */}
+      {onDelete && (
+        <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the transaction.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleConfirmDelete} className="bg-red-600 hover:bg-red-700">
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   )
 }

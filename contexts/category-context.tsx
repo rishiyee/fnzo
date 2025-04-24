@@ -25,6 +25,9 @@ type CategoryMap = {
   byNameAndType: Record<string, Category & { spending: number }>
 }
 
+const CATEGORY_UPDATED_EVENT = "category-updated"
+const CATEGORY_SYNC_EVENT = "category-sync"
+
 // Provider component
 export function CategoryProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
@@ -48,21 +51,21 @@ export function CategoryProvider({ children }: { children: ReactNode }) {
 
   // Function to refresh categories
   const refreshCategories = useCallback(async () => {
-    if (!user) return
-
     setIsLoading(true)
     setError(null)
 
     try {
-      const data = await categoryService.getAllCategoriesWithSpending()
-      setCategories(data)
+      console.log("Refreshing categories in context...")
+      const categoriesWithSpending = await categoryService.getAllCategoriesWithSpending()
+      console.log(`Retrieved ${categoriesWithSpending.length} categories with spending data`)
+      setCategories(categoriesWithSpending)
     } catch (error: any) {
-      console.error("Failed to load categories:", error)
-      setError(error?.message || "Failed to load categories. Please try again.")
+      console.error("Error refreshing categories:", error)
+      setError(error.message || "Failed to load categories")
     } finally {
       setIsLoading(false)
     }
-  }, [user])
+  }, [])
 
   // Load categories on mount and when user changes
   useEffect(() => {
@@ -75,6 +78,24 @@ export function CategoryProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     updateCategoryMap()
   }, [categories, updateCategoryMap])
+
+  // Listen for category updates
+  useEffect(() => {
+    const handleCategoryUpdate = () => {
+      console.log("Category update detected in context, refreshing categories...")
+      refreshCategories()
+    }
+
+    if (typeof window !== "undefined") {
+      window.addEventListener(CATEGORY_UPDATED_EVENT, handleCategoryUpdate)
+      window.addEventListener(CATEGORY_SYNC_EVENT, handleCategoryUpdate)
+
+      return () => {
+        window.removeEventListener(CATEGORY_UPDATED_EVENT, handleCategoryUpdate)
+        window.removeEventListener(CATEGORY_SYNC_EVENT, handleCategoryUpdate)
+      }
+    }
+  }, [refreshCategories])
 
   // Helper function to get category name by ID
   const getCategoryName = useCallback(

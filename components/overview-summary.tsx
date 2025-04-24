@@ -1,19 +1,15 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { ExpenseSummary } from "./expense-summary"
-import { ExpenseSummarySkeleton } from "./skeleton/expense-summary-skeleton"
-import { UnifiedFilter } from "./unified-filter"
-import type { Expense } from "@/types/expense"
-import { expenseService } from "@/lib/expense-service"
-import { useFilter } from "@/contexts/filter-context"
-import { useToast } from "@/hooks/use-toast"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AlertCircle, RefreshCcw } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { useState, useEffect, useCallback } from "react"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import Link from "next/link"
-import { ArrowRight } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Plus } from "lucide-react"
+import { ExpenseTracker } from "@/components/expense-tracker"
+import { TransactionModal } from "@/components/transaction-modal"
+import { expenseService } from "@/lib/expense-service"
+import { useToast } from "@/hooks/use-toast"
+import type { Expense } from "@/types/expense"
 
 interface OverviewSummaryProps {
   onExpensesUpdated?: (expenses: Expense[]) => void
@@ -21,130 +17,123 @@ interface OverviewSummaryProps {
 }
 
 export default function OverviewSummary({ onExpensesUpdated, onAddTransaction }: OverviewSummaryProps) {
+  const [activeTab, setActiveTab] = useState("recent")
+  const [isModalOpen, setIsModalOpen] = useState(false)
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const { toast } = useToast()
-  const { applyFilters } = useFilter()
 
-  // Load expenses from Supabase
-  const loadExpenses = async () => {
-    setIsLoading(true)
-    setError(null)
-
+  const loadExpenses = useCallback(async () => {
     try {
-      // Verify authentication first
-      const isAuthenticated = await expenseService.verifyAuthentication()
-      if (!isAuthenticated) {
-        setError("Authentication failed. Please sign in again.")
-        return
-      }
-
-      console.log("Loading expenses...")
+      setIsLoading(true)
       const data = await expenseService.getExpenses()
-      console.log("Expenses loaded:", data.length)
       setExpenses(data)
-    } catch (error: any) {
-      console.error("Failed to load expenses:", error)
-
-      // Check if it's an auth error
-      if (
-        error.message?.includes("auth") ||
-        error.message?.includes("JWT") ||
-        error.message?.includes("token") ||
-        error.code === "PGRST301"
-      ) {
-        setError("Authentication error. Please sign in again.")
-      } else {
-        setError(error?.message || "Failed to load expenses. Please try again.")
+      if (onExpensesUpdated) {
+        onExpensesUpdated(data)
       }
-
+    } catch (error) {
+      console.error("Failed to load expenses:", error)
       toast({
         title: "Error",
-        description: error?.message || "Failed to load expenses. Please try again.",
+        description: "Failed to load transactions. Please try again.",
         variant: "destructive",
       })
     } finally {
       setIsLoading(false)
     }
-  }
-
-  // Effect to notify parent when expenses change
-  useEffect(() => {
-    if (onExpensesUpdated && !isLoading && expenses.length > 0) {
-      onExpensesUpdated(expenses)
-    }
-  }, [expenses, isLoading, onExpensesUpdated])
+  }, [onExpensesUpdated, toast])
 
   useEffect(() => {
     loadExpenses()
-  }, [])
+  }, [loadExpenses])
 
-  // Get filtered expenses
-  const filteredExpenses = applyFilters(expenses)
+  const handleTransactionAdded = (expense: Expense) => {
+    setExpenses((prev) => [expense, ...prev])
+    if (onExpensesUpdated) {
+      onExpensesUpdated([expense, ...expenses])
+    }
+  }
 
-  if (error) {
-    return (
-      <div className="space-y-4">
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-        <div className="flex justify-center">
-          <Button onClick={loadExpenses} className="flex items-center gap-2">
-            <RefreshCcw className="h-4 w-4" />
-            Try Again
-          </Button>
-        </div>
-      </div>
-    )
+  const handleTransactionUpdated = (updatedExpense: Expense) => {
+    const updatedExpenses = expenses.map((expense) => (expense.id === updatedExpense.id ? updatedExpense : expense))
+    setExpenses(updatedExpenses)
+    if (onExpensesUpdated) {
+      onExpensesUpdated(updatedExpenses)
+    }
+  }
+
+  const handleTransactionDeleted = (id: string) => {
+    const updatedExpenses = expenses.filter((expense) => expense.id !== id)
+    setExpenses(updatedExpenses)
+    if (onExpensesUpdated) {
+      onExpensesUpdated(updatedExpenses)
+    }
   }
 
   return (
-    <div className="space-y-8">
-      <div className="space-y-4">
-        <UnifiedFilter compact={true} />
-      </div>
-
-      {isLoading ? <ExpenseSummarySkeleton /> : <ExpenseSummary expenses={filteredExpenses} />}
-
-      {/* Recent Transactions Card with Link */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+    <Card className="w-full">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-xl">Recent Transactions</CardTitle>
-            <CardDescription>View and manage your recent financial activities</CardDescription>
+            <CardTitle>Recent Transactions</CardTitle>
+            <CardDescription>Your recent financial activities</CardDescription>
           </div>
-          <Button variant="outline" asChild>
-            <Link href="/transactions" className="flex items-center gap-2">
-              View All
-              <ArrowRight className="h-4 w-4" />
-            </Link>
+          <Button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Add Transaction
           </Button>
-        </CardHeader>
-        <CardContent className="pt-4">
-          {isLoading ? (
-            <div className="h-20 flex items-center justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            </div>
-          ) : filteredExpenses.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">No transactions found for the current filters.</div>
-          ) : (
-            <div className="space-y-4">
-              <div className="text-sm text-muted-foreground">
-                You have {filteredExpenses.length} {filteredExpenses.length === 1 ? "transaction" : "transactions"} that
-                match your filters.
-              </div>
-              <div className="flex justify-center">
-                <Button asChild>
-                  <Link href="/transactions">Go to Transactions</Link>
-                </Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </CardHeader>
+      <CardContent className="p-0">
+        <Tabs defaultValue="recent" value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <div className="px-6">
+            <TabsList className="w-full grid grid-cols-3">
+              <TabsTrigger value="recent">Recent</TabsTrigger>
+              <TabsTrigger value="expense">Expenses</TabsTrigger>
+              <TabsTrigger value="income">Income</TabsTrigger>
+            </TabsList>
+          </div>
+
+          <TabsContent value="recent" className="m-0">
+            <ExpenseTracker
+              expenses={expenses}
+              isLoading={isLoading}
+              onUpdate={handleTransactionUpdated}
+              onDelete={handleTransactionDeleted}
+              onAddTransaction={onAddTransaction}
+              limit={5}
+            />
+          </TabsContent>
+
+          <TabsContent value="expense" className="m-0">
+            <ExpenseTracker
+              expenses={expenses.filter((expense) => expense.type === "expense")}
+              isLoading={isLoading}
+              onUpdate={handleTransactionUpdated}
+              onDelete={handleTransactionDeleted}
+              onAddTransaction={onAddTransaction}
+              limit={5}
+            />
+          </TabsContent>
+
+          <TabsContent value="income" className="m-0">
+            <ExpenseTracker
+              expenses={expenses.filter((expense) => expense.type === "income")}
+              isLoading={isLoading}
+              onUpdate={handleTransactionUpdated}
+              onDelete={handleTransactionDeleted}
+              onAddTransaction={onAddTransaction}
+              limit={5}
+            />
+          </TabsContent>
+        </Tabs>
+      </CardContent>
+
+      <TransactionModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onTransactionAdded={handleTransactionAdded}
+      />
+    </Card>
   )
 }

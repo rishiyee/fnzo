@@ -12,6 +12,8 @@ export interface Category {
   icon?: string
   isDefault?: boolean
   spending?: number
+  usageCount?: number
+  lastUsed?: string
 }
 
 // Default colors for categories
@@ -31,16 +33,32 @@ const DEFAULT_COLORS = [
 // Cache for categories
 let categoriesCache: Category[] | null = null
 let lastFetchTime = 0
-const CACHE_TTL = 60000 // 1 minute
+const CACHE_TTL = 30000 // 30 seconds - reduced to ensure more frequent updates
 
-// Create a custom event name for category updates
+// Create custom event names for category updates
 export const CATEGORY_UPDATED_EVENT = "category-updated"
+export const CATEGORY_SYNC_EVENT = "category-sync"
 
 // Function to dispatch category update event
-export const dispatchCategoryUpdate = (category: Category) => {
+export const dispatchCategoryUpdate = (category: Category, oldName?: string) => {
   if (typeof window !== "undefined") {
-    const event = new CustomEvent(CATEGORY_UPDATED_EVENT, { detail: category })
+    const event = new CustomEvent(CATEGORY_UPDATED_EVENT, {
+      detail: {
+        category,
+        oldName,
+      },
+    })
     window.dispatchEvent(event)
+    console.log(`Dispatched category update event for: ${category.name}${oldName ? ` (was: ${oldName})` : ""}`)
+  }
+}
+
+// Function to dispatch category sync event (for global updates)
+export const dispatchCategorySync = () => {
+  if (typeof window !== "undefined") {
+    const event = new CustomEvent(CATEGORY_SYNC_EVENT)
+    window.dispatchEvent(event)
+    console.log("Dispatched category sync event")
   }
 }
 
@@ -88,6 +106,8 @@ export const categoryService = {
           color: cat.color,
           icon: cat.icon,
           isDefault: cat.is_default,
+          usageCount: cat.usage_count || 0,
+          lastUsed: cat.last_used,
         }))
 
         // Update cache
@@ -133,6 +153,7 @@ export const categoryService = {
             type,
             color: DEFAULT_COLORS[index % DEFAULT_COLORS.length],
             isDefault: true,
+            usageCount: 0,
           })
         })
       }
@@ -159,6 +180,8 @@ export const categoryService = {
           color: cat.color,
           icon: cat.icon,
           is_default: cat.isDefault, // Use snake_case for database column
+          usage_count: cat.usageCount || 0,
+          last_used: cat.lastUsed,
         })),
       )
 
@@ -207,6 +230,8 @@ export const categoryService = {
         color: category.color,
         icon: category.icon,
         is_default: category.isDefault === undefined ? false : category.isDefault, // Use snake_case for database column
+        usage_count: 0,
+        last_used: null,
       }
 
       const { data, error } = await supabase.from("categories").insert(dbCategory).select().single()
@@ -226,6 +251,8 @@ export const categoryService = {
         color: data.color,
         icon: data.icon,
         isDefault: data.is_default,
+        usageCount: data.usage_count || 0,
+        lastUsed: data.last_used,
       }
 
       // Invalidate cache
@@ -233,6 +260,7 @@ export const categoryService = {
 
       // Dispatch update event
       dispatchCategoryUpdate(newCategory)
+      dispatchCategorySync()
 
       return newCategory
     } catch (error) {
@@ -263,6 +291,14 @@ export const categoryService = {
         dbUpdates.is_default = updates.isDefault
         delete dbUpdates.isDefault
       }
+      if ("usageCount" in updates) {
+        dbUpdates.usage_count = updates.usageCount
+        delete dbUpdates.usageCount
+      }
+      if ("lastUsed" in updates) {
+        dbUpdates.last_used = updates.lastUsed
+        delete dbUpdates.lastUsed
+      }
 
       const { data, error } = await supabase.from("categories").update(dbUpdates).eq("id", id).select().single()
 
@@ -281,18 +317,22 @@ export const categoryService = {
         color: data.color,
         icon: data.icon,
         isDefault: data.is_default,
+        usageCount: data.usage_count || 0,
+        lastUsed: data.last_used,
       }
 
       // Invalidate cache
       categoriesCache = null
 
       // If the name was updated, we need to update all expenses with this category
-      if (updates.name && currentCategory.name !== updates.name) {
-        await this.updateExpenseCategoryNames(currentCategory.name, updates.name, data.type)
+      const oldName = currentCategory.name
+      if (updates.name && oldName !== updates.name) {
+        await this.updateExpenseCategoryNames(oldName, updates.name, data.type)
       }
 
-      // Dispatch update event
-      dispatchCategoryUpdate(updatedCategory)
+      // Dispatch update event with both old and new category data
+      dispatchCategoryUpdate(updatedCategory, updates.name && oldName !== updates.name ? oldName : undefined)
+      dispatchCategorySync()
 
       return updatedCategory
     } catch (error) {
@@ -306,7 +346,7 @@ export const categoryService = {
       const supabase = getSupabaseBrowserClient()
 
       // Update all expenses with the old category name to use the new name
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("expenses")
         .update({ category: newName })
         .eq("category", oldName)
@@ -317,7 +357,11 @@ export const categoryService = {
         throw error
       }
 
-      console.log(`Updated expenses from category "${oldName}" to "${newName}"`)
+      const updatedCount = data?.length || 0
+      console.log(`Updated ${updatedCount} expenses from category "${oldName}" to "${newName}"`)
+
+      // Trigger a global sync event to refresh all components
+      dispatchCategorySync()
     } catch (error) {
       console.error("Error in updateExpenseCategoryNames:", error)
       throw error
@@ -327,6 +371,18 @@ export const categoryService = {
   async deleteCategory(id: string, replacementCategoryId?: string): Promise<void> {
     try {
       const supabase = getSupabaseBrowserClient()
+
+      // Get the category before deleting it
+      const { data: categoryToDelete, error: fetchError } = await supabase
+        .from("categories")
+        .select("*")
+        .eq("id", id)
+        .single()
+
+      if (fetchError) {
+        console.error("Error fetching category to delete:", fetchError)
+        throw fetchError
+      }
 
       // If a replacement category is provided, reassign expenses first
       if (replacementCategoryId) {
@@ -344,7 +400,13 @@ export const categoryService = {
       categoriesCache = null
 
       // Dispatch update event for deletion (with empty name to indicate deletion)
-      dispatchCategoryUpdate({ id, name: "", type: "expense" })
+      dispatchCategoryUpdate({
+        id,
+        name: "",
+        type: categoryToDelete.type as ExpenseType,
+        isDefault: categoryToDelete.is_default,
+      })
+      dispatchCategorySync()
     } catch (error) {
       console.error("Error in deleteCategory:", error)
       throw error
@@ -378,7 +440,18 @@ export const categoryService = {
       }
 
       // Begin transaction by reassigning expenses
-      await this.reassignExpenses(sourceId, targetId)
+      const transactionCount = await this.reassignExpenses(sourceId, targetId)
+
+      // Update the usage count of the target category
+      if (transactionCount > 0) {
+        await supabase
+          .from("categories")
+          .update({
+            usage_count: (targetCategory.usage_count || 0) + (sourceCategory.usage_count || 0),
+            last_used: new Date().toISOString(),
+          })
+          .eq("id", targetId)
+      }
 
       // Then delete the source category
       const { error: deleteError } = await supabase.from("categories").delete().eq("id", sourceId)
@@ -396,12 +469,14 @@ export const categoryService = {
         id: targetId,
         name: targetCategory.name,
         type: targetCategory.type as ExpenseType,
+        usageCount: (targetCategory.usage_count || 0) + (sourceCategory.usage_count || 0),
       })
       dispatchCategoryUpdate({
         id: sourceId,
         name: "",
         type: sourceCategory.type as ExpenseType,
       })
+      dispatchCategorySync()
 
       console.log(`Successfully merged category "${sourceCategory.name}" into "${targetCategory.name}"`)
     } catch (error) {
@@ -410,7 +485,7 @@ export const categoryService = {
     }
   },
 
-  async reassignExpenses(fromCategoryId: string, toCategoryId: string): Promise<void> {
+  async reassignExpenses(fromCategoryId: string, toCategoryId: string): Promise<number> {
     try {
       const supabase = getSupabaseBrowserClient()
 
@@ -449,7 +524,7 @@ export const categoryService = {
 
       if (!expenses || expenses.length === 0) {
         // No expenses to reassign
-        return
+        return 0
       }
 
       // Update all expenses to the target category
@@ -462,6 +537,9 @@ export const categoryService = {
         console.error("Error updating expenses:", updateError)
         throw updateError
       }
+
+      console.log(`Reassigned ${expenses.length} expenses from "${fromCategory.name}" to "${toCategory.name}"`)
+      return expenses.length
     } catch (error) {
       console.error("Error in reassignExpenses:", error)
       throw error
@@ -500,23 +578,191 @@ export const categoryService = {
     try {
       // Get all categories
       const categories = await this.getCategories()
+      console.log(`Retrieved ${categories.length} categories`)
 
       // Get all expenses
       const expenses = await expenseService.getExpenses()
+      console.log(`Retrieved ${expenses.length} expenses for spending calculation`)
 
-      // Calculate spending for each category
-      return categories.map((category) => {
+      // Calculate spending and usage for each category
+      const result = categories.map((category) => {
         const categoryExpenses = expenses.filter((e) => e.category === category.name && e.type === category.type)
-
         const spending = categoryExpenses.reduce((total, expense) => total + expense.amount, 0)
+        const usageCount = categoryExpenses.length
+
+        console.log(`Category "${category.name}" (${category.type}): ${usageCount} transactions, ₹${spending} spending`)
+
+        // Find the most recent transaction date
+        let lastUsed = category.lastUsed
+        if (categoryExpenses.length > 0) {
+          const dates = categoryExpenses.map((e) => new Date(e.date))
+          const mostRecent = new Date(Math.max(...dates.map((d) => d.getTime())))
+          lastUsed = mostRecent.toISOString()
+          console.log(`Category "${category.name}" last used on: ${new Date(lastUsed).toLocaleDateString()}`)
+        }
+
+        // Update usage statistics in the database if they've changed
+        if ((usageCount !== category.usageCount || lastUsed !== category.lastUsed) && usageCount > 0) {
+          this.updateCategoryUsage(category.id, usageCount, lastUsed)
+        }
 
         return {
           ...category,
           spending,
+          usageCount,
+          lastUsed,
         }
       })
+
+      return result
     } catch (error) {
       console.error("Error in getAllCategoriesWithSpending:", error)
+      throw error
+    }
+  },
+
+  async updateCategoryUsage(categoryId: string, usageCount: number, lastUsed?: string): Promise<void> {
+    try {
+      const supabase = getSupabaseBrowserClient()
+
+      const updates: any = { usage_count: usageCount }
+      if (lastUsed) {
+        updates.last_used = lastUsed
+      }
+
+      await supabase.from("categories").update(updates).eq("id", categoryId)
+
+      // We don't invalidate the cache here to avoid too many refreshes
+    } catch (error) {
+      console.error("Error updating category usage:", error)
+      // Don't throw the error as this is a background update
+    }
+  },
+
+  async getRecentlyUsedCategories(limit = 5): Promise<(Category & { spending: number })[]> {
+    try {
+      console.log(`Fetching up to ${limit} recently used categories...`)
+
+      // Get all categories with spending data
+      const allCategories = await this.getAllCategoriesWithSpending()
+      console.log(`Total categories fetched: ${allCategories.length}`)
+
+      // Get all expenses for the current month to ensure we have the most recent data
+      const currentDate = new Date()
+      const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
+      const lastDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0)
+
+      const supabase = getSupabaseBrowserClient()
+      const { data: recentExpenses, error } = await supabase
+        .from("expenses")
+        .select("*")
+        .gte("date", firstDayOfMonth.toISOString())
+        .lte("date", lastDayOfMonth.toISOString())
+        .order("date", { ascending: false })
+
+      if (error) {
+        console.error("Error fetching recent expenses:", error)
+        throw error
+      }
+
+      console.log(`Recent expenses fetched: ${recentExpenses?.length || 0}`)
+
+      // Extract unique categories from recent expenses
+      const recentCategoryNames = new Set<string>()
+      recentExpenses?.forEach((expense) => {
+        recentCategoryNames.add(expense.category)
+      })
+
+      console.log(`Unique category names from recent expenses: ${recentCategoryNames.size}`)
+      console.log(`Category names: ${Array.from(recentCategoryNames).join(", ")}`)
+
+      // Filter categories to only include those that appear in recent expenses
+      let recentCategories = allCategories.filter(
+        (cat) => recentCategoryNames.has(cat.name) || (cat.usageCount && cat.usageCount > 0),
+      )
+
+      console.log(`Categories after filtering for recent usage: ${recentCategories.length}`)
+
+      // Sort by most recently used and then by usage count
+      recentCategories = recentCategories.sort((a, b) => {
+        // First sort by last used date (most recent first)
+        if (a.lastUsed && b.lastUsed) {
+          return new Date(b.lastUsed).getTime() - new Date(a.lastUsed).getTime()
+        } else if (a.lastUsed) {
+          return -1
+        } else if (b.lastUsed) {
+          return 1
+        }
+
+        // Then by usage count (highest first)
+        return (b.usageCount || 0) - (a.usageCount || 0)
+      })
+
+      // Apply the limit
+      const result = recentCategories.slice(0, limit)
+      console.log(`Returning ${result.length} recent categories`)
+
+      return result
+    } catch (error) {
+      console.error("Error getting recently used categories:", error)
+      return []
+    }
+  },
+
+  // Add a new function to specifically update a category's budget limit
+  async updateCategoryLimit(categoryId: string, budget?: number): Promise<Category> {
+    try {
+      const supabase = getSupabaseBrowserClient()
+
+      // Get the current category
+      const { data: currentCategory, error: fetchError } = await supabase
+        .from("categories")
+        .select("*")
+        .eq("id", categoryId)
+        .single()
+
+      if (fetchError) {
+        console.error("Error fetching current category:", fetchError)
+        throw fetchError
+      }
+
+      // Update only the budget field
+      const { data, error } = await supabase
+        .from("categories")
+        .update({ budget })
+        .eq("id", categoryId)
+        .select()
+        .single()
+
+      if (error) {
+        console.error("Error updating category limit:", error)
+        throw error
+      }
+
+      // Map database response back to our interface
+      const updatedCategory: Category = {
+        id: data.id,
+        name: data.name,
+        description: data.description,
+        type: data.type as ExpenseType,
+        budget: data.budget,
+        color: data.color,
+        icon: data.icon,
+        isDefault: data.is_default,
+        usageCount: data.usage_count || 0,
+        lastUsed: data.last_used,
+      }
+
+      // Invalidate cache
+      categoriesCache = null
+
+      // Dispatch update event
+      dispatchCategoryUpdate(updatedCategory)
+      dispatchCategorySync()
+
+      return updatedCategory
+    } catch (error) {
+      console.error("Error in updateCategoryLimit:", error)
       throw error
     }
   },

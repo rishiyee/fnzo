@@ -53,6 +53,40 @@ export function ExpenseForm({ onSubmit, initialData, isSubmitting = false, isMod
     loadCategories()
   }, [type])
 
+  // Add a useEffect to listen for category updates
+  useEffect(() => {
+    const handleCategoryUpdate = () => {
+      // Refresh categories when a category is updated
+      const loadCategories = async () => {
+        try {
+          console.log("Refreshing categories in expense form due to category update event")
+          const allCategories = await expenseService.getCategories()
+          setCategories(allCategories)
+
+          // If the current category no longer exists, reset it
+          if (category && !allCategories[type]?.includes(category)) {
+            console.log(`Selected category "${category}" no longer exists in type "${type}", resetting selection`)
+            setCategory("")
+          }
+        } catch (error) {
+          console.error("Error loading categories:", error)
+        }
+      }
+
+      loadCategories()
+    }
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("category-updated", handleCategoryUpdate)
+      window.addEventListener("category-sync", handleCategoryUpdate)
+
+      return () => {
+        window.removeEventListener("category-updated", handleCategoryUpdate)
+        window.removeEventListener("category-sync", handleCategoryUpdate)
+      }
+    }
+  }, [category, type])
+
   // Format currency for display
   const formatCurrency = (value: string) => {
     if (!value) return ""

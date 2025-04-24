@@ -147,7 +147,7 @@ export default function TransactionsPage() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center">
+      <div className="flex min-h-screen flex-col items-center justify-center w-full">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     )
@@ -159,8 +159,8 @@ export default function TransactionsPage() {
 
   return (
     <AppLayout>
-      <div className="p-6">
-        <div className="flex justify-between items-center mb-6">
+      <div className="p-6 w-full">
+        <div className="flex justify-between items-center mb-6 w-full">
           <div>
             <h1 className="text-2xl font-bold">Recent Transactions</h1>
             <p className="text-muted-foreground">View and manage your recent financial activities</p>
@@ -171,7 +171,7 @@ export default function TransactionsPage() {
           </Button>
         </div>
 
-        <div className="mb-6">
+        <div className="mb-6 w-full">
           <UnifiedFilter />
           <div className="mt-2 text-sm text-muted-foreground">
             {filteredExpenses.length} {filteredExpenses.length === 1 ? "transaction" : "transactions"} found
@@ -181,14 +181,16 @@ export default function TransactionsPage() {
         {isLoadingExpenses ? (
           <ExpenseTableSkeleton />
         ) : (
-          <ExpenseTable
-            expenses={sortedFilteredExpenses}
-            onUpdate={updateExpense}
-            onDelete={deleteExpense}
-            onSort={handleSort}
-            sortConfig={sortConfig}
-            isLoading={false}
-          />
+          <div className="w-full overflow-x-auto">
+            <ExpenseTable
+              expenses={sortedFilteredExpenses}
+              onUpdate={updateExpense}
+              onDelete={deleteExpense}
+              onSort={handleSort}
+              sortConfig={sortConfig}
+              isLoading={false}
+            />
+          </div>
         )}
 
         <TransactionModal

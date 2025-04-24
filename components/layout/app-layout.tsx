@@ -62,9 +62,9 @@ export function AppLayout({ children }: AppLayoutProps) {
       </div>
 
       {/* Main content */}
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex flex-1 flex-col overflow-hidden w-full">
         {/* Mobile header */}
-        <div className="lg:hidden border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="lg:hidden border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 w-full">
           <div className="flex h-16 items-center justify-between px-4">
             <Button variant="ghost" size="icon" onClick={openMobileSidebar}>
               <Menu className="h-6 w-6" />
@@ -78,7 +78,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         </div>
 
         {/* Main content area */}
-        <main className="flex-1 overflow-y-auto">{children}</main>
+        <main className="flex-1 overflow-y-auto w-full">{children}</main>
       </div>
     </div>
   )

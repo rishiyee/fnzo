@@ -1,102 +1,123 @@
 "use client"
 
-import { useState, useMemo } from "react"
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
+import { useMemo, useState } from "react"
+import { format, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from "date-fns"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Label } from "@/components/ui/label"
-import { format, parseISO, startOfMonth, endOfMonth, eachMonthOfInterval, isSameMonth } from "date-fns"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts"
 import type { Expense } from "@/types/expense"
-import { useTheme } from "next-themes"
 
 interface ExpenseGraphProps {
   expenses: Expense[]
-  className?: string
 }
 
-export function ExpenseGraph({ expenses, className }: ExpenseGraphProps) {
-  const { theme } = useTheme()
-  const isDarkTheme = theme === "dark"
+export function ExpenseGraph({ expenses }: ExpenseGraphProps) {
+  const [timeRange, setTimeRange] = useState<"7d" | "30d" | "90d" | "1y">("30d")
 
-  // State for selected series
-  const [selectedSeries, setSelectedSeries] = useState({
-    income: true,
-    expense: true,
-    savings: true,
-    balance: true,
-  })
+  // Calculate date range based on selected time range
+  const dateRange = useMemo(() => {
+    const today = new Date()
+    let startDate: Date
 
-  // Toggle series visibility
-  const toggleSeries = (series: keyof typeof selectedSeries) => {
-    setSelectedSeries((prev) => ({
-      ...prev,
-      [series]: !prev[series],
-    }))
-  }
+    switch (timeRange) {
+      case "7d":
+        startDate = subMonths(today, 0.25) // Approximately 7 days
+        break
+      case "30d":
+        startDate = subMonths(today, 1)
+        break
+      case "90d":
+        startDate = subMonths(today, 3)
+        break
+      case "1y":
+        startDate = subMonths(today, 12)
+        break
+      default:
+        startDate = subMonths(today, 1)
+    }
 
-  // Process data for the graph
-  const graphData = useMemo(() => {
-    if (!expenses.length) return []
+    return {
+      start: startOfMonth(startDate),
+      end: endOfMonth(today),
+    }
+  }, [timeRange])
 
-    // Find date range
-    const dates = expenses.map((expense) => new Date(expense.date))
-    const minDate = new Date(Math.min(...dates.map((date) => date.getTime())))
-    const maxDate = new Date(Math.max(...dates.map((date) => date.getTime())))
-
-    // Create array of months in the range
-    const monthsInRange = eachMonthOfInterval({
-      start: startOfMonth(minDate),
-      end: endOfMonth(maxDate),
+  // Generate data for the chart
+  const chartData = useMemo(() => {
+    // Create an array of all days in the range
+    const days = eachDayOfInterval({
+      start: dateRange.start,
+      end: dateRange.end,
     })
 
-    // Aggregate data by month
-    return monthsInRange.map((month) => {
-      const monthlyExpenses = expenses.filter((expense) => isSameMonth(parseISO(expense.date), month))
+    // Initialize data with zero values for each day
+    const data = days.map((day) => ({
+      date: day,
+      expense: 0,
+      income: 0,
+      savings: 0,
+    }))
 
-      const income = monthlyExpenses
-        .filter((expense) => expense.type === "income")
-        .reduce((sum, expense) => sum + expense.amount, 0)
+    // Populate with actual expense data
+    expenses.forEach((expense) => {
+      const expenseDate = new Date(expense.date)
 
-      const expenseAmount = monthlyExpenses
-        .filter((expense) => expense.type === "expense")
-        .reduce((sum, expense) => sum + expense.amount, 0)
+      // Only include expenses within the date range
+      if (expenseDate >= dateRange.start && expenseDate <= dateRange.end) {
+        const dayIndex = data.findIndex((d) => isSameDay(d.date, expenseDate))
 
-      const savings = monthlyExpenses
-        .filter((expense) => expense.type === "savings")
-        .reduce((sum, expense) => sum + expense.amount, 0)
-
-      const balance = income - expenseAmount - savings
-
-      return {
-        month: format(month, "MMM yyyy"),
-        income,
-        expense: expenseAmount,
-        savings,
-        balance,
+        if (dayIndex !== -1) {
+          if (expense.type === "expense") {
+            data[dayIndex].expense += expense.amount
+          } else if (expense.type === "income") {
+            data[dayIndex].income += expense.amount
+          } else if (expense.type === "savings") {
+            data[dayIndex].savings += expense.amount
+          }
+        }
       }
     })
-  }, [expenses])
 
-  // Format currency for tooltip
-  const formatCurrency = (value: number) => {
+    // Format dates for display
+    return data.map((item) => ({
+      ...item,
+      name: format(item.date, "MMM dd"),
+    }))
+  }, [expenses, dateRange])
+
+  // Calculate totals for the selected period
+  const totals = useMemo(() => {
+    return chartData.reduce(
+      (acc, item) => {
+        acc.expense += item.expense
+        acc.income += item.income
+        acc.savings += item.savings
+        return acc
+      },
+      { expense: 0, income: 0, savings: 0 },
+    )
+  }, [chartData])
+
+  // Format currency for display
+  const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-IN", {
       style: "currency",
       currency: "INR",
       maximumFractionDigits: 0,
-    }).format(value)
+    }).format(amount)
   }
 
-  // Custom tooltip component
+  // Custom tooltip for the chart
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-background border rounded-md shadow-lg p-4">
-          <p className="font-medium mb-2 text-sm">{label}</p>
-          {payload.map((entry: any) => (
-            <div key={entry.name} className="flex items-center gap-2 mb-1.5">
+        <div className="bg-background border rounded-md shadow-md p-3">
+          <p className="font-medium">{label}</p>
+          {payload.map((entry: any, index: number) => (
+            <div key={`item-${index}`} className="flex items-center gap-2 mt-1">
               <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }} />
-              <span className="capitalize text-sm">{entry.name}:</span>
-              <span className="font-medium text-sm">{formatCurrency(entry.value)}</span>
+              <span className="capitalize">{entry.name}:</span>
+              <span className="font-medium">{formatCurrency(entry.value)}</span>
             </div>
           ))}
         </div>
@@ -105,155 +126,91 @@ export function ExpenseGraph({ expenses, className }: ExpenseGraphProps) {
     return null
   }
 
-  // Define colors for each series
-  const seriesColors = {
-    income: "#10b981", // green
-    expense: "#ef4444", // red
-    savings: "#3b82f6", // blue
-    balance: "#8b5cf6", // purple
-  }
-
   return (
-    <Card className={className}>
-      <CardHeader>
-        <CardTitle>Financial Trends</CardTitle>
-        <CardDescription>Track your income, expenses, savings, and balance over time</CardDescription>
-
-        <div className="flex flex-wrap gap-4 mt-2">
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="income-series"
-              checked={selectedSeries.income}
-              onCheckedChange={() => toggleSeries("income")}
-              className="data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
-            />
-            <Label htmlFor="income-series" className="cursor-pointer">
-              Income
-            </Label>
+    <Card className="w-full">
+      <CardHeader className="pb-2">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <CardTitle>Financial Overview</CardTitle>
+            <CardDescription>Track your expenses, income, and savings over time</CardDescription>
           </div>
-
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="expense-series"
-              checked={selectedSeries.expense}
-              onCheckedChange={() => toggleSeries("expense")}
-              className="data-[state=checked]:bg-red-500 data-[state=checked]:border-red-500"
-            />
-            <Label htmlFor="expense-series" className="cursor-pointer">
-              Expenses
-            </Label>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="savings-series"
-              checked={selectedSeries.savings}
-              onCheckedChange={() => toggleSeries("savings")}
-              className="data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
-            />
-            <Label htmlFor="savings-series" className="cursor-pointer">
-              Savings
-            </Label>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="balance-series"
-              checked={selectedSeries.balance}
-              onCheckedChange={() => toggleSeries("balance")}
-              className="data-[state=checked]:bg-purple-500 data-[state=checked]:border-purple-500"
-            />
-            <Label htmlFor="balance-series" className="cursor-pointer">
-              Balance
-            </Label>
-          </div>
+          <Tabs defaultValue="30d" value={timeRange} onValueChange={(value) => setTimeRange(value as any)}>
+            <TabsList>
+              <TabsTrigger value="7d">7D</TabsTrigger>
+              <TabsTrigger value="30d">30D</TabsTrigger>
+              <TabsTrigger value="90d">90D</TabsTrigger>
+              <TabsTrigger value="1y">1Y</TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
       </CardHeader>
-
       <CardContent>
-        {graphData.length > 0 ? (
-          <div className="w-full h-[300px] mt-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={graphData} margin={{ top: 10, right: 10, left: 5, bottom: 10 }}>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke={isDarkTheme ? "rgba(102, 102, 102, 0.15)" : "rgba(204, 204, 204, 0.3)"}
-                  strokeWidth={0.8}
-                  vertical={true}
-                  horizontal={true}
-                />
-                <XAxis
-                  dataKey="month"
-                  tick={{ fill: isDarkTheme ? "rgba(204, 204, 204, 0.8)" : "rgba(51, 51, 51, 0.8)" }}
-                  tickLine={{ stroke: isDarkTheme ? "rgba(102, 102, 102, 0.3)" : "rgba(204, 204, 204, 0.5)" }}
-                  axisLine={false}
-                  dy={10}
-                />
-                <YAxis
-                  tickFormatter={(value) => `₹${value / 1000}k`}
-                  tick={{ fill: isDarkTheme ? "rgba(204, 204, 204, 0.8)" : "rgba(51, 51, 51, 0.8)" }}
-                  tickLine={{ stroke: isDarkTheme ? "rgba(102, 102, 102, 0.3)" : "rgba(204, 204, 204, 0.5)" }}
-                  axisLine={false}
-                  dx={-5}
-                />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend wrapperStyle={{ paddingTop: 15 }} />
-
-                {selectedSeries.income && (
-                  <Line
-                    type="monotone"
-                    dataKey="income"
-                    name="Income"
-                    stroke={seriesColors.income}
-                    strokeWidth={2.5}
-                    dot={{ r: 3, strokeWidth: 1, fill: seriesColors.income }}
-                    activeDot={{ r: 6, strokeWidth: 0 }}
-                  />
-                )}
-
-                {selectedSeries.expense && (
-                  <Line
-                    type="monotone"
-                    dataKey="expense"
-                    name="Expense"
-                    stroke={seriesColors.expense}
-                    strokeWidth={2.5}
-                    dot={{ r: 3, strokeWidth: 1, fill: seriesColors.expense }}
-                    activeDot={{ r: 6, strokeWidth: 0 }}
-                  />
-                )}
-
-                {selectedSeries.savings && (
-                  <Line
-                    type="monotone"
-                    dataKey="savings"
-                    name="Savings"
-                    stroke={seriesColors.savings}
-                    strokeWidth={2.5}
-                    dot={{ r: 3, strokeWidth: 1, fill: seriesColors.savings }}
-                    activeDot={{ r: 6, strokeWidth: 0 }}
-                  />
-                )}
-
-                {selectedSeries.balance && (
-                  <Line
-                    type="monotone"
-                    dataKey="balance"
-                    name="Balance"
-                    stroke={seriesColors.balance}
-                    strokeWidth={2.5}
-                    dot={{ r: 3, strokeWidth: 1, fill: seriesColors.balance }}
-                    activeDot={{ r: 6, strokeWidth: 0 }}
-                  />
-                )}
-              </LineChart>
-            </ResponsiveContainer>
+        <div className="flex flex-wrap gap-4 mb-4 w-full">
+          <div className="bg-muted/30 rounded-md px-4 py-2 flex-1 min-w-[120px]">
+            <div className="text-sm text-muted-foreground">Expenses</div>
+            <div className="text-xl font-bold text-red-500">{formatCurrency(totals.expense)}</div>
           </div>
-        ) : (
-          <div className="flex items-center justify-center h-[300px] text-muted-foreground">
-            No data available for the selected filters
+          <div className="bg-muted/30 rounded-md px-4 py-2 flex-1 min-w-[120px]">
+            <div className="text-sm text-muted-foreground">Income</div>
+            <div className="text-xl font-bold text-green-500">{formatCurrency(totals.income)}</div>
           </div>
-        )}
+          <div className="bg-muted/30 rounded-md px-4 py-2 flex-1 min-w-[120px]">
+            <div className="text-sm text-muted-foreground">Savings</div>
+            <div className="text-xl font-bold text-blue-500">{formatCurrency(totals.savings)}</div>
+          </div>
+          <div className="bg-muted/30 rounded-md px-4 py-2 flex-1 min-w-[120px]">
+            <div className="text-sm text-muted-foreground">Net</div>
+            <div
+              className={`text-xl font-bold ${totals.income - totals.expense > 0 ? "text-green-500" : "text-red-500"}`}
+            >
+              {formatCurrency(totals.income - totals.expense)}
+            </div>
+          </div>
+        </div>
+
+        <div className="h-[300px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart
+              data={chartData}
+              margin={{
+                top: 5,
+                right: 10,
+                left: 10,
+                bottom: 5,
+              }}
+            >
+              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <XAxis dataKey="name" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} minTickGap={10} />
+              <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} tickFormatter={(value) => `₹${value}`} />
+              <Tooltip content={<CustomTooltip />} />
+              <Legend />
+              <Line
+                type="monotone"
+                dataKey="expense"
+                name="Expense"
+                stroke="#ef4444"
+                activeDot={{ r: 8 }}
+                strokeWidth={2}
+              />
+              <Line
+                type="monotone"
+                dataKey="income"
+                name="Income"
+                stroke="#22c55e"
+                activeDot={{ r: 8 }}
+                strokeWidth={2}
+              />
+              <Line
+                type="monotone"
+                dataKey="savings"
+                name="Savings"
+                stroke="#3b82f6"
+                activeDot={{ r: 8 }}
+                strokeWidth={2}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
       </CardContent>
     </Card>
   )

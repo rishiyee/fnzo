@@ -54,7 +54,7 @@ const mapExpenseToDbExpense = (expense: Expense, userId: string): InsertExpense 
 
 // Cache for expenses to reduce database queries
 let expensesCache: Expense[] | null = null
-let lastFetchTime = 0
+const lastFetchTime = 0
 const CACHE_TTL = 60000 // 1 minute
 
 // Format currency for display
@@ -157,70 +157,24 @@ export const expenseService = {
   },
   async getExpenses(): Promise<Expense[]> {
     try {
-      // Check if we have a valid cache
-      const now = Date.now()
-      if (expensesCache && now - lastFetchTime < CACHE_TTL) {
-        return expensesCache
-      }
-
       const supabase = getSupabaseBrowserClient()
 
-      // Get the current session with caching
-      let session
-      if (sessionCache && now - sessionCache.timestamp < SESSION_CACHE_TTL) {
-        session = sessionCache.session
-      } else {
-        const {
-          data: { session: newSession },
-          error: sessionError,
-        } = await supabase.auth.getSession()
-
-        if (sessionError) {
-          console.error("Session error:", sessionError)
-          throw new Error("Failed to get session: " + sessionError.message)
-        }
-
-        if (!newSession) {
-          throw new Error("User not authenticated")
-        }
-
-        session = newSession
-        sessionCache = {
-          session,
-          timestamp: now,
-        }
+      // First, verify authentication
+      const isAuthenticated = await this.verifyAuthentication()
+      if (!isAuthenticated) {
+        throw new Error("User not authenticated")
       }
 
-      console.log("Fetching expenses with session:", {
-        userId: session.user.id,
-        hasAccessToken: !!session.access_token,
-        expiresAt: session.expires_at ? new Date(session.expires_at * 1000).toISOString() : "unknown",
-      })
-
-      // Fetch expenses
+      // Fetch all expenses without pagination to ensure we get everything
       const { data, error } = await supabase.from("expenses").select("*").order("date", { ascending: false })
 
       if (error) {
         console.error("Error fetching expenses:", error)
-
-        // Clear session cache on auth errors
-        if (error.code === "PGRST301" || error.message.includes("JWT") || error.message.includes("auth")) {
-          sessionCache = null
-        }
-
         throw error
       }
 
-      // Update cache
-      expensesCache = (data || []).map(mapDbExpenseToExpense)
-      lastFetchTime = now
-
-      // Initialize categories from expenses if not already done
-      if (!categoriesCacheInitialized) {
-        await this.initializeCategories(expensesCache)
-      }
-
-      return expensesCache
+      console.log(`Retrieved ${data?.length || 0} total expenses from database`)
+      return data || []
     } catch (error) {
       console.error("Error in getExpenses:", error)
       throw error

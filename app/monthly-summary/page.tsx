@@ -106,7 +106,7 @@ export default function MonthlySummaryPage() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center">
+      <div className="flex min-h-screen flex-col items-center justify-center w-full">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     )
@@ -118,20 +118,22 @@ export default function MonthlySummaryPage() {
 
   return (
     <AppLayout>
-      <div className="p-6">
-        <div className="mb-6">
+      <div className="p-6 w-full">
+        <div className="mb-6 w-full">
           <h1 className="text-2xl font-bold">Monthly Summary</h1>
           <p className="text-muted-foreground">Detailed financial overview for the selected month</p>
         </div>
 
-        <MonthSelector
-          selectedMonth={selectedMonth}
-          onChange={setSelectedMonth}
-          maxDate={new Date()} // Don't allow selecting future months
-        />
+        <div className="w-full">
+          <MonthSelector
+            selectedMonth={selectedMonth}
+            onChange={setSelectedMonth}
+            maxDate={new Date()} // Don't allow selecting future months
+          />
+        </div>
 
         {error ? (
-          <div className="space-y-4 mb-6">
+          <div className="space-y-4 mb-6 w-full">
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>Error</AlertTitle>
@@ -145,22 +147,22 @@ export default function MonthlySummaryPage() {
             </div>
           </div>
         ) : isLoadingExpenses ? (
-          <div className="space-y-6">
-            <div className="h-24 bg-muted/30 rounded-lg animate-pulse"></div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-6 w-full">
+            <div className="h-24 bg-muted/30 rounded-lg animate-pulse w-full"></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
               <div className="h-80 bg-muted/30 rounded-lg animate-pulse"></div>
               <div className="h-80 bg-muted/30 rounded-lg animate-pulse"></div>
             </div>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-6 w-full">
             <MonthlyMetrics
               expenses={monthlyExpenses}
               selectedMonth={selectedMonth}
               previousMonthExpenses={previousMonthExpenses}
             />
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 w-full">
               <CategoryBreakdown expenses={monthlyExpenses} type="expense" />
               <MonthlyComparison
                 expenses={monthlyExpenses}
@@ -169,7 +171,7 @@ export default function MonthlySummaryPage() {
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
               <TopTransactions expenses={monthlyExpenses} type="expense" limit={5} />
               <TopTransactions expenses={monthlyExpenses} type="income" limit={5} />
               <TopTransactions expenses={monthlyExpenses} type="savings" limit={5} />
