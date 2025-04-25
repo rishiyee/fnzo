@@ -80,6 +80,14 @@ export function MonthlyMetrics({ expenses, selectedMonth, previousMonthExpenses 
 
   const previousMonthName = format(subMonths(selectedMonth, 1), "MMMM")
 
+  // Calculate total income, expenses, and savings
+  const totalIncome = expenses.filter((e) => e.type === "income").reduce((sum, e) => sum + e.amount, 0)
+  const totalExpenses = expenses.filter((e) => e.type === "expense").reduce((sum, e) => sum + e.amount, 0)
+  const totalSavings = expenses.filter((e) => e.type === "savings").reduce((sum, e) => sum + e.amount, 0)
+
+  // Calculate net profit
+  const netProfit = totalIncome - totalExpenses - totalSavings
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       <Card>
@@ -180,6 +188,27 @@ export function MonthlyMetrics({ expenses, selectedMonth, previousMonthExpenses 
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Net Profit Card */}
+      <Card className="w-full">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className={`text-2xl font-bold ${netProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
+            {formatCurrency(netProfit)}
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">Income - Expenses - Savings</p>
+          <div className="mt-2 text-xs">
+            <span className={netProfit >= 0 ? "text-green-600" : "text-red-600"}>
+              {(Math.abs(netProfit) / (totalIncome || 1)) * 100 < 1
+                ? "<1"
+                : Math.round((Math.abs(netProfit) / (totalIncome || 1)) * 100)}
+              % of income
+            </span>
           </div>
         </CardContent>
       </Card>

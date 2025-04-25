@@ -14,7 +14,7 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ children }: AppLayoutProps) {
-  const { isMobileSidebarOpen, setMobileSidebarOpen } = useSidebar()
+  const { isMobileSidebarOpen, setMobileSidebarOpen, isCollapsed } = useSidebar()
 
   const openMobileSidebar = useCallback(() => {
     setMobileSidebarOpen(true)
@@ -40,7 +40,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         {/* Sidebar */}
         <div
           className={cn(
-            "relative flex w-72 max-w-xs flex-1 flex-col bg-black transition-transform",
+            "relative flex w-72 max-w-xs flex-1 flex-col bg-background transition-transform",
             isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full",
           )}
         >
@@ -56,7 +56,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
       {/* Desktop sidebar */}
       <div className="hidden lg:flex lg:flex-shrink-0">
-        <div className="flex w-64 flex-col">
+        <div className={cn("flex flex-col transition-all duration-300", isCollapsed ? "w-16" : "w-64")}>
           <Sidebar />
         </div>
       </div>
