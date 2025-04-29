@@ -12,6 +12,7 @@ import { expenseService } from "@/lib/expense-service"
 import { useFilter } from "@/contexts/filter-context"
 import type { Expense } from "@/types/expense"
 import { useToast } from "@/hooks/use-toast"
+import { Header } from "@/components/header"
 
 export default function Home() {
   const { user, isLoading, refreshSession } = useAuth()
@@ -22,6 +23,7 @@ export default function Home() {
   const { toast } = useToast()
   const hasAttemptedRefresh = useRef(false)
   const addTransactionCallback = useRef<((expense: Expense) => void) | null>(null)
+  const addTransactionsCallback = useRef<((expenses: Expense[]) => void) | null>(null)
   const { applyFilters } = useFilter()
 
   useEffect(() => {
@@ -332,6 +334,11 @@ export default function Home() {
     addTransactionCallback.current = callback
   }, [])
 
+  // Register the callback for adding multiple transactions
+  const registerAddTransactionsCallback = useCallback((callback: (expenses: Expense[]) => void) => {
+    addTransactionsCallback.current = callback
+  }, [])
+
   // Handle transaction added
   const handleTransactionAdded = useCallback((expense: Expense) => {
     // Update the expenses state in this component
@@ -340,6 +347,17 @@ export default function Home() {
     // Call the callback in ExpenseTracker if it exists
     if (addTransactionCallback.current) {
       addTransactionCallback.current(expense)
+    }
+  }, [])
+
+  // Handle multiple transactions added
+  const handleTransactionsAdded = useCallback((newExpenses: Expense[]) => {
+    // Update the expenses state in this component
+    setExpenses((prev) => [...newExpenses, ...prev])
+
+    // Call the callback in ExpenseTracker if it exists
+    if (addTransactionsCallback.current) {
+      addTransactionsCallback.current(newExpenses)
     }
   }, [])
 
@@ -373,9 +391,18 @@ export default function Home() {
           <OverviewSummary
             onExpensesUpdated={handleExpensesUpdated}
             onAddTransaction={registerAddTransactionCallback}
+            onAddTransactions={registerAddTransactionsCallback}
           />
         </div>
       </div>
+
+      <Header
+        onExportCSV={handleExportCSV}
+        onImportCSV={handleImportCSV}
+        expenses={expenses}
+        onTransactionAdded={handleTransactionAdded}
+        onTransactionsAdded={handleTransactionsAdded}
+      />
     </AppLayout>
   )
 }

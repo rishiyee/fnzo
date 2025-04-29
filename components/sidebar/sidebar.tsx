@@ -17,6 +17,7 @@ import {
   CircleDollarSign,
   Tags,
   ChevronLeft,
+  FileIcon as FileTemplate,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -142,6 +143,13 @@ export function Sidebar({ className }: SidebarProps) {
             icon={<Tags className="h-5 w-5" />}
             label="Categories"
             active={isActive("/category-limits")}
+          />
+
+          <NavItem
+            href="/templates"
+            icon={<FileTemplate className="h-5 w-5" />}
+            label="Templates"
+            active={isActive("/templates")}
           />
 
           <Separator className="my-2" />

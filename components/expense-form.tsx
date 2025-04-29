@@ -14,6 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 import { expenseService } from "@/lib/expense-service"
+import { TemplateSelector } from "@/components/templates/template-selector"
+import type { TransactionTemplate } from "@/types/template"
 
 import type { Expense, ExpenseType, ExpenseCategory } from "@/types/expense"
 
@@ -191,11 +193,26 @@ export function ExpenseForm({ onSubmit, initialData, isSubmitting = false, isMod
     setCategory("")
   }
 
+  // Handle template selection
+  const handleTemplateSelect = (template: TransactionTemplate) => {
+    setType(template.type)
+    setCategory(template.category)
+    setAmount(template.amount.toString())
+    setNotes(template.notes)
+  }
+
   // Determine if the form is in a submitting state
   const formIsSubmitting = isSubmitting || localSubmitting
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="mb-4">
+        <Label htmlFor="template" className="text-sm font-medium mb-1 block">
+          Use Template
+        </Label>
+        <TemplateSelector onSelectTemplate={handleTemplateSelect} type={type} />
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="flex flex-col space-y-1.5">
           <Label htmlFor="date" className="text-sm font-medium">
