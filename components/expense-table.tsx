@@ -19,6 +19,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import type { Expense } from "@/types/expense"
+import { HiddenValue } from "@/components/hidden-value"
 
 interface ExpenseTableProps {
   expenses: Expense[]
@@ -152,7 +153,9 @@ export function ExpenseTable({
                   </Badge>
                 </TableCell>
                 <TableCell>{expense.category}</TableCell>
-                <TableCell className="text-right font-medium">{formatCurrency(expense.amount)}</TableCell>
+                <TableCell className="text-right font-medium">
+                  <HiddenValue value={formatCurrency(expense.amount)} />
+                </TableCell>
                 <TableCell className="max-w-[200px] truncate">{expense.notes}</TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end space-x-2">

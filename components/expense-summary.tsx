@@ -5,8 +5,8 @@ import { ArrowDownIcon, ArrowUpIcon, PiggyBankIcon, CheckCircle, AlertCircle } f
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Progress } from "@/components/ui/progress"
 import type { Expense } from "@/types/expense"
+import { HiddenValue } from "@/components/hidden-value"
 
 type ExpenseSummaryProps = {
   expenses: Expense[]
@@ -82,73 +82,18 @@ export function ExpenseSummary({ expenses }: ExpenseSummaryProps) {
           <ArrowUpIcon className="h-4 w-4 text-green-500" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{formatCurrency(summary.totalIncome)}</div>
+          <div className="text-2xl font-bold">
+            <HiddenValue value={formatCurrency(summary.totalIncome)} />
+          </div>
           <p className="text-xs text-muted-foreground">Total money coming in</p>
 
-          {/* Income allocation breakdown */}
-          <div className="mt-4 space-y-2">
-            <p className="text-xs font-medium">Income Allocation</p>
-            <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
-              <div className="flex h-full">
-                <div
-                  className="bg-red-500 h-full"
-                  style={{ width: `${Math.min(summary.expensesPercentage, 100)}%` }}
-                ></div>
-                <div
-                  className="bg-blue-500 h-full"
-                  style={{ width: `${Math.min(summary.savingsPercentage, 100)}%` }}
-                ></div>
-                <div
-                  className="bg-green-500 h-full"
-                  style={{
-                    width: `${Math.max(0, Math.min(100 - summary.expensesPercentage - summary.savingsPercentage, 100))}%`,
-                  }}
-                ></div>
-              </div>
-            </div>
-            <div className="flex text-xs justify-between">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger>
-                    <span className="flex items-center">
-                      <span className="h-2 w-2 bg-red-500 rounded-full mr-1"></span>
-                      <span>Expenses: {summary.expensesPercentage.toFixed(1)}%</span>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>{formatCurrency(summary.totalExpenses)}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger>
-                    <span className="flex items-center">
-                      <span className="h-2 w-2 bg-blue-500 rounded-full mr-1"></span>
-                      <span>Savings: {summary.savingsPercentage.toFixed(1)}%</span>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>{formatCurrency(summary.actualSavings)}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger>
-                    <span className="flex items-center">
-                      <span className="h-2 w-2 bg-green-500 rounded-full mr-1"></span>
-                      <span>Balance: {(100 - summary.expensesPercentage - summary.savingsPercentage).toFixed(1)}%</span>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>{formatCurrency(summary.balance)}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
+          {/* Income allocation - simplified */}
+          <div className="mt-4 flex justify-between text-xs">
+            <span className="text-red-500">Expenses: {summary.expensesPercentage.toFixed(1)}%</span>
+            <span className="text-blue-500">Savings: {summary.savingsPercentage.toFixed(1)}%</span>
+            <span className="text-green-500">
+              Balance: {(100 - summary.expensesPercentage - summary.savingsPercentage).toFixed(1)}%
+            </span>
           </div>
         </CardContent>
       </Card>
@@ -159,26 +104,19 @@ export function ExpenseSummary({ expenses }: ExpenseSummaryProps) {
           <ArrowDownIcon className="h-4 w-4 text-red-500" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{formatCurrency(summary.totalExpenses)}</div>
+          <div className="text-2xl font-bold">
+            <HiddenValue value={formatCurrency(summary.totalExpenses)} />
+          </div>
           <div className="flex items-center justify-between mt-1">
             <p className="text-xs text-muted-foreground">Total money going out</p>
             <p className="text-xs font-medium text-red-500">{summary.expensesPercentage.toFixed(1)}% of income</p>
           </div>
 
-          {/* Expenses percentage visualization */}
+          {/* Expenses percentage - simplified */}
           <div className="mt-4">
-            <div className="flex justify-between items-center mb-1">
+            <div className="flex justify-between items-center">
               <span className="text-xs font-medium">Percentage of Income</span>
-            </div>
-            <Progress
-              value={summary.expensesPercentage}
-              className="h-2"
-              indicatorClassName={summary.expensesPercentage > 70 ? "bg-red-500" : "bg-amber-500"}
-            />
-            <div className="flex justify-between mt-1">
-              <span className="text-xs text-muted-foreground">0%</span>
-              <span className="text-xs text-muted-foreground">50%</span>
-              <span className="text-xs text-muted-foreground">100%</span>
+              <span className="text-xs font-medium text-red-500">{summary.expensesPercentage.toFixed(1)}%</span>
             </div>
           </div>
         </CardContent>
@@ -218,20 +156,17 @@ export function ExpenseSummary({ expenses }: ExpenseSummaryProps) {
               <span className="text-sm font-medium">Target (30%)</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-xl font-bold">{formatCurrency(summary.actualSavings)}</span>
-              <span className="text-md text-muted-foreground">{formatCurrency(summary.recommendedSavings)}</span>
+              <span className="text-xl font-bold">
+                <HiddenValue value={formatCurrency(summary.actualSavings)} />
+              </span>
+              <span className="text-md text-muted-foreground">
+                <HiddenValue value={formatCurrency(summary.recommendedSavings)} />
+              </span>
             </div>
           </div>
 
-          {/* Progress bar */}
-          <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
-            <div
-              className={`h-2.5 rounded-full ${summary.isSavingEnough ? "bg-green-600" : "bg-amber-500"}`}
-              style={{ width: `${summary.savingsProgress}%` }}
-            ></div>
-          </div>
-
-          <div className="flex justify-between items-center text-xs">
+          {/* Savings metrics - simplified */}
+          <div className="mt-2 flex justify-between items-center text-xs">
             <span className={summary.isSavingEnough ? "text-green-600" : "text-amber-500"}>
               {summary.savingsProgress}% of target
             </span>
@@ -251,7 +186,7 @@ export function ExpenseSummary({ expenses }: ExpenseSummaryProps) {
         </CardHeader>
         <CardContent>
           <div className={`text-2xl font-bold ${summary.balance >= 0 ? "text-green-600" : "text-red-600"}`}>
-            {formatCurrency(summary.balance)}
+            <HiddenValue value={formatCurrency(summary.balance)} />
           </div>
           <div className="flex items-center justify-between mt-1">
             <p className="text-xs text-muted-foreground">Income - Expenses - Savings</p>
@@ -260,20 +195,13 @@ export function ExpenseSummary({ expenses }: ExpenseSummaryProps) {
             </p>
           </div>
 
-          {/* Balance visualization */}
+          {/* Balance percentage - simplified */}
           <div className="mt-4">
-            <div className="flex justify-between items-center mb-1">
+            <div className="flex justify-between items-center">
               <span className="text-xs font-medium">Remaining Income</span>
-            </div>
-            <Progress
-              value={100 - summary.expensesPercentage - summary.savingsPercentage}
-              className="h-2"
-              indicatorClassName={summary.balance >= 0 ? "bg-green-500" : "bg-red-500"}
-            />
-            <div className="flex justify-between mt-1">
-              <span className="text-xs text-muted-foreground">0%</span>
-              <span className="text-xs text-muted-foreground">50%</span>
-              <span className="text-xs text-muted-foreground">100%</span>
+              <span className="text-xs font-medium">
+                {(100 - summary.expensesPercentage - summary.savingsPercentage).toFixed(1)}%
+              </span>
             </div>
           </div>
         </CardContent>

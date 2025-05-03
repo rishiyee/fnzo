@@ -7,7 +7,9 @@ import { AuthProvider } from "@/contexts/auth-context"
 import { SidebarProvider } from "@/contexts/sidebar-context"
 import { FilterProvider } from "@/contexts/filter-context"
 import { CategoryProvider } from "@/contexts/category-context"
+import { VisibilityProvider } from "@/contexts/visibility-context"
 import { Toaster } from "@/components/ui/toaster"
+import { Header } from "@/components/header"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -30,8 +32,11 @@ export default function RootLayout({
             <SidebarProvider>
               <FilterProvider>
                 <CategoryProvider>
-                  {children}
-                  <Toaster />
+                  <VisibilityProvider>
+                    <Header />
+                    {children}
+                    <Toaster />
+                  </VisibilityProvider>
                 </CategoryProvider>
               </FilterProvider>
             </SidebarProvider>
