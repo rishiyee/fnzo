@@ -16,7 +16,7 @@ interface OverviewSummaryProps {
   onAddTransaction?: (callback: (expense: Expense) => void) => void
 }
 
-export default function OverviewSummary({ onExpensesUpdated, onAddTransaction }: OverviewSummaryProps) {
+export function OverviewSummary({ onExpensesUpdated, onAddTransaction }: OverviewSummaryProps) {
   const [activeTab, setActiveTab] = useState("recent")
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [expenses, setExpenses] = useState<Expense[]>([])

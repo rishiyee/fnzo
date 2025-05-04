@@ -32,7 +32,7 @@ export default function AuthPageClient() {
   return (
     <div className="min-h-screen flex flex-col">
       <div className="flex-1 flex items-center justify-center p-4">
-        <AuthForm mode={mode as "signin" | "signup"} />
+        <AuthForm />
       </div>
     </div>
   )

@@ -3,11 +3,13 @@
 import { useEffect, useState, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
-import OverviewSummary from "@/components/overview-summary"
+import { AppLayout } from "@/components/layout/app-layout"
 import { OverviewStats } from "@/components/overview-stats"
 import { ExpenseGraph } from "@/components/expense-graph"
-import { ExpenseGraphSkeleton } from "@/components/skeleton/expense-graph-skeleton"
-import { AppLayout } from "@/components/layout/app-layout"
+import { MonthlyMetrics } from "@/components/monthly-metrics"
+import { MonthlyComparison } from "@/components/monthly-comparison"
+import { CategoryBreakdown } from "@/components/category-breakdown"
+import { TopTransactions } from "@/components/top-transactions"
 import { expenseService } from "@/lib/expense-service"
 import { useFilter } from "@/contexts/filter-context"
 import type { Expense } from "@/types/expense"
@@ -378,22 +380,20 @@ export default function Home() {
 
   return (
     <AppLayout>
-      <div className="p-6 w-full">
-        <div className="mb-6 w-full">
-          <h1 className="text-2xl font-bold">Overview</h1>
-          <p className="text-muted-foreground">Welcome back! Here's a summary of your finances.</p>
-        </div>
-        <div className="space-y-8 w-full">
-          <OverviewStats />
+      <div className="space-y-8">
+        <OverviewStats />
 
-          {isLoadingExpenses ? <ExpenseGraphSkeleton /> : <ExpenseGraph expenses={filteredExpenses} />}
-
-          <OverviewSummary
-            onExpensesUpdated={handleExpensesUpdated}
-            onAddTransaction={registerAddTransactionCallback}
-            onAddTransactions={registerAddTransactionsCallback}
-          />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <ExpenseGraph />
+          <MonthlyMetrics />
         </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <MonthlyComparison />
+          <CategoryBreakdown />
+        </div>
+
+        <TopTransactions />
       </div>
 
       <Header
