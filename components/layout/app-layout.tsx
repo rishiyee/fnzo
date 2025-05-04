@@ -1,84 +1,60 @@
-"use client"
-
 import type React from "react"
+;('"use client')
 
-import { useCallback } from "react"
+import { useEffect } from "react"
+import { useRouter, usePathname } from "next/navigation"
+import { useAuth } from "@/contexts/auth-context"
 import { Sidebar } from "@/components/sidebar/sidebar"
-import { Button } from "@/components/ui/button"
-import { Menu, X } from "lucide-react"
-import { cn } from "@/lib/utils"
 import { useSidebar } from "@/contexts/sidebar-context"
+import { Header } from "@/components/header"
 
-interface AppLayoutProps {
+export function AppLayout({
+  children,
+}: {
   children: React.ReactNode
-}
+}) {
+  const { user, isLoading } = useAuth()
+  const router = useRouter()
+  const pathname = usePathname()
+  const { isCollapsed } = useSidebar()
 
-export function AppLayout({ children }: AppLayoutProps) {
-  const { isMobileSidebarOpen, setMobileSidebarOpen, isCollapsed } = useSidebar()
+  useEffect(() => {
+    if (!isLoading && !user && pathname !== "/auth") {
+      router.push("/auth")
+    }
+  }, [user, isLoading, router, pathname])
 
-  const openMobileSidebar = useCallback(() => {
-    setMobileSidebarOpen(true)
-  }, [setMobileSidebarOpen])
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
 
-  const closeMobileSidebar = useCallback(() => {
-    setMobileSidebarOpen(false)
-  }, [setMobileSidebarOpen])
+  if (!user && pathname !== "/auth") {
+    return null
+  }
+
+  if (pathname === "/auth") {
+    return (
+      <div className="flex flex-col min-h-screen">
+        <Header />
+        <div className="flex-1">{children}</div>
+      </div>
+    )
+  }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      {/* Mobile sidebar */}
-      <div className={cn("fixed inset-0 z-40 flex lg:hidden", isMobileSidebarOpen ? "visible" : "invisible")}>
-        {/* Backdrop */}
-        <div
-          className={cn(
-            "fixed inset-0 bg-zinc-900/80 backdrop-blur-sm transition-opacity",
-            isMobileSidebarOpen ? "opacity-100" : "opacity-0",
-          )}
-          onClick={closeMobileSidebar}
-        />
-
-        {/* Sidebar */}
-        <div
-          className={cn(
-            "relative flex w-72 max-w-xs flex-1 flex-col bg-background transition-transform",
-            isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full",
-          )}
+    <div className="flex flex-col min-h-screen">
+      <Header />
+      <div className="flex flex-1 overflow-hidden">
+        <Sidebar />
+        <main
+          className={`flex-1 w-full p-4 md:p-6 overflow-y-auto transition-all duration-300 ${isCollapsed ? "md:ml-16" : "md:ml-64"}`}
         >
-          <div className="absolute top-0 right-0 -mr-12 pt-4">
-            <Button variant="ghost" size="icon" className="text-white" onClick={closeMobileSidebar}>
-              <X className="h-6 w-6" />
-              <span className="sr-only">Close sidebar</span>
-            </Button>
-          </div>
-          <Sidebar />
-        </div>
-      </div>
-
-      {/* Desktop sidebar */}
-      <div className="hidden lg:flex lg:flex-shrink-0">
-        <div className={cn("flex flex-col transition-all duration-300", isCollapsed ? "w-16" : "w-64")}>
-          <Sidebar />
-        </div>
-      </div>
-
-      {/* Main content */}
-      <div className="flex flex-1 flex-col overflow-hidden w-full">
-        {/* Mobile header */}
-        <div className="lg:hidden border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 w-full">
-          <div className="flex h-16 items-center justify-between px-4">
-            <Button variant="ghost" size="icon" onClick={openMobileSidebar}>
-              <Menu className="h-6 w-6" />
-              <span className="sr-only">Open sidebar</span>
-            </Button>
-            <div className="flex items-center">
-              <span className="text-xl font-bold">Fnzo</span>
-            </div>
-            <div className="w-6" /> {/* Spacer for centering */}
-          </div>
-        </div>
-
-        {/* Main content area */}
-        <main className="flex-1 overflow-y-auto w-full">{children}</main>
+          <div className="w-full max-w-full mx-auto">{children}</div>
+        </main>
       </div>
     </div>
   )
