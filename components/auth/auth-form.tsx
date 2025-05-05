@@ -1,200 +1,216 @@
 "use client"
 
-import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import * as z from "zod"
+import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Separator } from "@/components/ui/separator"
-import { Github } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { Icons } from "@/components/icons"
+import { Checkbox } from "@/components/ui/checkbox"
 
-export function AuthForm() {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+// Form validation schemas
+const signInSchema = z.object({
+  email: z.string().email({ message: "Please enter a valid email address" }),
+  password: z.string().min(1, { message: "Password is required" }),
+  rememberMe: z.boolean().optional(),
+})
+
+const signUpSchema = z.object({
+  email: z.string().email({ message: "Please enter a valid email address" }),
+  password: z.string().min(6, { message: "Password must be at least 6 characters" }),
+  terms: z.boolean().refine((val) => val === true, {
+    message: "You must agree to the terms and conditions",
+  }),
+})
+
+type AuthFormProps = {
+  mode: "signin" | "signup"
+}
+
+export function AuthForm({ mode }: AuthFormProps) {
+  const [isLoading, setIsLoading] = useState(false)
+  const { signIn, signUp } = useAuth()
+  const { toast } = useToast()
   const router = useRouter()
-  const supabase = createClientComponentClient()
 
-  const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
+  // Initialize form with the appropriate schema
+  const form = useForm<z.infer<typeof signInSchema | typeof signUpSchema>>({
+    resolver: zodResolver(mode === "signin" ? signInSchema : signUpSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+      ...(mode === "signin" ? { rememberMe: false } : { terms: false }),
+    },
+  })
+
+  // Handle form submission
+  const onSubmit = async (values: z.infer<typeof signInSchema | typeof signUpSchema>) => {
+    setIsLoading(true)
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
+      if (mode === "signin") {
+        const { error } = await signIn(values.email, values.password)
+        if (error) {
+          handleAuthError(error)
+          return
+        }
 
-      if (error) {
-        setError(error.message)
-      } else {
+        // Add a small delay to ensure the session is properly set
+        await new Promise((resolve) => setTimeout(resolve, 500))
+
+        toast({
+          title: "Success",
+          description: "You have been signed in successfully",
+        })
+
+        // Navigate to home page
         router.push("/")
-        router.refresh()
-      }
-    } catch (error) {
-      setError("An unexpected error occurred")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
-    setSuccessMessage(null)
-
-    try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
-      })
-
-      if (error) {
-        setError(error.message)
       } else {
-        setSuccessMessage("Check your email for the confirmation link")
+        const { error } = await signUp(values.email, values.password)
+        if (error) {
+          handleAuthError(error)
+          return
+        }
+        toast({
+          title: "Account created",
+          description: "Please check your email for the confirmation link",
+        })
       }
     } catch (error) {
-      setError("An unexpected error occurred")
+      console.error(`${mode} error:`, error)
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      })
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
   }
 
-  const handleGithubSignIn = async () => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "github",
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
+  // Handle authentication errors
+  const handleAuthError = (error: any) => {
+    if (error.status === 429) {
+      toast({
+        title: "Too many attempts",
+        description: "Please try again later.",
+        variant: "destructive",
       })
-
-      if (error) {
-        setError(error.message)
-      }
-    } catch (error) {
-      setError("An unexpected error occurred")
-    } finally {
-      setLoading(false)
+    } else if (error.message?.includes("credentials")) {
+      toast({
+        title: "Invalid credentials",
+        description: "Please check your email and password.",
+        variant: "destructive",
+      })
+    } else {
+      toast({
+        title: "Authentication error",
+        description: error.message || "An error occurred during authentication.",
+        variant: "destructive",
+      })
     }
   }
 
   return (
-    <Card className="w-full max-w-md mx-auto">
-      <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl font-bold text-center">Fnzo</CardTitle>
-        <CardDescription className="text-center">Your personal finance tracker</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Tabs defaultValue="signin" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-4">
-            <TabsTrigger value="signin">Sign In</TabsTrigger>
-            <TabsTrigger value="signup">Sign Up</TabsTrigger>
-          </TabsList>
-          <TabsContent value="signin">
-            <form onSubmit={handleSignIn} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <FormField
+          control={form.control}
+          name="email"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Email</FormLabel>
+              <FormControl>
                 <Input
-                  id="email"
                   type="email"
                   placeholder="name@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
+                  autoComplete={mode === "signin" ? "email" : "new-email"}
+                  disabled={isLoading}
+                  {...field}
                 />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="password"
+          render={({ field }) => (
+            <FormItem>
+              <div className="flex items-center justify-between">
+                <FormLabel>Password</FormLabel>
+                {mode === "signin" && (
+                  <Button variant="link" className="px-0 font-normal h-auto" type="button" disabled={isLoading}>
+                    Forgot password?
+                  </Button>
+                )}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+              <FormControl>
                 <Input
-                  id="password"
                   type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
+                  placeholder={mode === "signin" ? "••••••" : "Create a password"}
+                  autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                  disabled={isLoading}
+                  {...field}
                 />
-              </div>
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Signing in..." : "Sign In"}
-              </Button>
-            </form>
-          </TabsContent>
-          <TabsContent value="signup">
-            <form onSubmit={handleSignUp} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email-signup">Email</Label>
-                <Input
-                  id="email-signup"
-                  type="email"
-                  placeholder="name@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password-signup">Password</Label>
-                <Input
-                  id="password-signup"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-              </div>
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Signing up..." : "Sign Up"}
-              </Button>
-            </form>
-          </TabsContent>
-        </Tabs>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-        {error && (
-          <Alert variant="destructive" className="mt-4">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
+        {mode === "signin" ? (
+          <FormField
+            control={form.control}
+            name="rememberMe"
+            render={({ field }) => (
+              <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md">
+                <FormControl>
+                  <Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isLoading} />
+                </FormControl>
+                <div className="space-y-1 leading-none">
+                  <FormLabel className="font-normal">Remember me</FormLabel>
+                </div>
+              </FormItem>
+            )}
+          />
+        ) : (
+          <FormField
+            control={form.control}
+            name="terms"
+            render={({ field }) => (
+              <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md">
+                <FormControl>
+                  <Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isLoading} />
+                </FormControl>
+                <div className="space-y-1 leading-none">
+                  <FormLabel className="font-normal">
+                    I agree to the{" "}
+                    <a href="#" className="text-primary hover:underline">
+                      Terms of Service
+                    </a>{" "}
+                    and{" "}
+                    <a href="#" className="text-primary hover:underline">
+                      Privacy Policy
+                    </a>
+                  </FormLabel>
+                </div>
+              </FormItem>
+            )}
+          />
         )}
 
-        {successMessage && (
-          <Alert className="mt-4">
-            <AlertDescription>{successMessage}</AlertDescription>
-          </Alert>
-        )}
-
-        <div className="relative my-4">
-          <div className="absolute inset-0 flex items-center">
-            <Separator />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
-          </div>
-        </div>
-
-        <Button variant="outline" type="button" className="w-full" onClick={handleGithubSignIn} disabled={loading}>
-          <Github className="mr-2 h-4 w-4" />
-          GitHub
+        <Button type="submit" className="w-full" disabled={isLoading}>
+          {isLoading && <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />}
+          {mode === "signin" ? "Sign In" : "Create Account"}
         </Button>
-      </CardContent>
-      <CardFooter className="flex justify-center text-sm text-muted-foreground">
-        <p>Fnzo - Manage your finances with ease</p>
-      </CardFooter>
-    </Card>
+      </form>
+    </Form>
   )
 }

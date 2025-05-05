@@ -1,15 +1,19 @@
 "use client"
 
-import { AppLayout } from "@/components/layout/app-layout"
-import { CategoryTable } from "@/components/category/category-table"
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 
-export default function CategoriesPage() {
+export default function CategoriesRedirectPage() {
+  const router = useRouter()
+
+  useEffect(() => {
+    router.push("/category-limits")
+  }, [router])
+
   return (
-    <AppLayout>
-      <div className="space-y-6">
-        <h1 className="text-2xl font-bold">Categories</h1>
-        <CategoryTable />
-      </div>
-    </AppLayout>
+    <div className="flex min-h-screen flex-col items-center justify-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <p className="mt-4">Redirecting to Category Management...</p>
+    </div>
   )
 }
