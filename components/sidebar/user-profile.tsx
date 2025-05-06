@@ -8,7 +8,11 @@ import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 
-export const UserProfile = memo(function UserProfile() {
+interface UserProfileProps {
+  collapsed?: boolean
+}
+
+export const UserProfile = memo(function UserProfile({ collapsed = false }: UserProfileProps) {
   const { user, signOut } = useAuth()
   const { toast } = useToast()
   const router = useRouter()
@@ -37,6 +41,21 @@ export const UserProfile = memo(function UserProfile() {
   const getInitials = () => {
     if (!user.email) return "U"
     return user.email.charAt(0).toUpperCase()
+  }
+
+  // If collapsed, only show the avatar with logout button
+  if (collapsed) {
+    return (
+      <div className="flex flex-col items-center justify-center">
+        <Avatar className="h-10 w-10 mb-2">
+          <AvatarFallback>{getInitials()}</AvatarFallback>
+        </Avatar>
+        <Button variant="ghost" size="icon" onClick={handleSignOut} className="text-zinc-400 hover:text-white">
+          <LogOut className="h-4 w-4" />
+          <span className="sr-only">Sign out</span>
+        </Button>
+      </div>
+    )
   }
 
   return (

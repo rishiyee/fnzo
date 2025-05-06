@@ -110,25 +110,6 @@ export function OverviewStats() {
             <HiddenValue value={formatCurrency(stats.totalIncome)} />
           </div>
           <p className="text-xs text-muted-foreground">All income transactions</p>
-
-          {/* Income allocation percentages */}
-          <div className="mt-4 space-y-2">
-            <p className="text-xs font-medium">Income Allocation</p>
-            <div className="flex flex-wrap gap-2 mt-1">
-              <div className="flex items-center">
-                <span className="h-3 w-3 bg-red-500 rounded-full mr-1"></span>
-                <span className="text-xs">Expenses: {stats.expensesPercentage.toFixed(1)}%</span>
-              </div>
-              <div className="flex items-center">
-                <span className="h-3 w-3 bg-blue-500 rounded-full mr-1"></span>
-                <span className="text-xs">Savings: {stats.savingsPercentage.toFixed(1)}%</span>
-              </div>
-              <div className="flex items-center">
-                <span className="h-3 w-3 bg-green-500 rounded-full mr-1"></span>
-                <span className="text-xs">Balance: {stats.balancePercentage.toFixed(1)}%</span>
-              </div>
-            </div>
-          </div>
         </CardContent>
       </Card>
 

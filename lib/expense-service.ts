@@ -54,7 +54,7 @@ const mapExpenseToDbExpense = (expense: Expense, userId: string): InsertExpense 
 
 // Cache for expenses to reduce database queries
 let expensesCache: Expense[] | null = null
-const lastFetchTime = 0
+let lastFetchTime = 0
 const CACHE_TTL = 60000 // 1 minute
 
 // Format currency for display
@@ -74,6 +74,9 @@ let sessionCache: {
   timestamp: number
 } | null = null
 const SESSION_CACHE_TTL = 30000 // 30 seconds
+
+// Helper function to implement exponential backoff for retries
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 export const expenseService = {
   // Add a function to verify authentication with caching
@@ -155,8 +158,16 @@ export const expenseService = {
       return false
     }
   },
+
   async getExpenses(): Promise<Expense[]> {
     try {
+      // Check if we have a valid cache
+      const now = Date.now()
+      if (expensesCache && now - lastFetchTime < CACHE_TTL) {
+        console.log("Using cached expenses data")
+        return expensesCache
+      }
+
       const supabase = getSupabaseBrowserClient()
 
       // First, verify authentication
@@ -165,18 +176,71 @@ export const expenseService = {
         throw new Error("User not authenticated")
       }
 
-      // Fetch all expenses without pagination to ensure we get everything
-      const { data, error } = await supabase.from("expenses").select("*").order("date", { ascending: false })
+      // Implement retry logic with exponential backoff
+      let retries = 0
+      const maxRetries = 3
+      let lastError: any = null
 
-      if (error) {
-        console.error("Error fetching expenses:", error)
-        throw error
+      while (retries < maxRetries) {
+        try {
+          // Fetch expenses with pagination to avoid large data transfers
+          const { data, error, status } = await supabase
+            .from("expenses")
+            .select("*")
+            .order("date", { ascending: false })
+
+          // Handle specific error cases
+          if (error) {
+            if (status === 429) {
+              // Rate limit hit - wait and retry
+              const backoffTime = Math.pow(2, retries) * 1000 // Exponential backoff
+              console.warn(`Rate limit hit, retrying in ${backoffTime}ms (attempt ${retries + 1}/${maxRetries})`)
+              await sleep(backoffTime)
+              retries++
+              continue
+            } else {
+              // Other error - throw it
+              throw error
+            }
+          }
+
+          // Success - update cache and return data
+          console.log(`Retrieved ${data?.length || 0} total expenses from database`)
+          expensesCache = data?.map(mapDbExpenseToExpense) || []
+          lastFetchTime = now
+          return expensesCache
+        } catch (error: any) {
+          lastError = error
+
+          // If it's not a rate limit error, don't retry
+          if (error.status !== 429) {
+            break
+          }
+
+          retries++
+          if (retries >= maxRetries) {
+            console.error(`Failed after ${maxRetries} retries`)
+            break
+          }
+        }
       }
 
-      console.log(`Retrieved ${data?.length || 0} total expenses from database`)
-      return data || []
+      // If we got here with lastError, throw it
+      if (lastError) {
+        console.error("Error fetching expenses after retries:", lastError)
+        throw lastError
+      }
+
+      // Fallback to empty array if something went wrong but no error was thrown
+      return []
     } catch (error) {
       console.error("Error in getExpenses:", error)
+
+      // Check if the error is a rate limit error
+      if (error instanceof Error && error.message.includes("Too Many Requests")) {
+        throw new Error("Too many requests to the database. Please try again later.")
+      }
+
       throw error
     }
   },
@@ -209,47 +273,70 @@ export const expenseService = {
         expenseAmount: formatCurrency(dbExpense.amount),
       })
 
-      const { data, error } = await supabase.from("expenses").insert(dbExpense).select().single()
+      // Implement retry logic for adding expense
+      let retries = 0
+      const maxRetries = 3
 
-      if (error) {
-        console.error("Error adding expense:", error)
+      while (retries < maxRetries) {
+        try {
+          const { data, error, status } = await supabase.from("expenses").insert(dbExpense).select().single()
 
-        // Handle specific Supabase errors
-        if (error.code === "23505") {
-          throw new Error("This transaction already exists")
-        } else if (error.code === "23503") {
-          throw new Error("Referenced record does not exist")
-        } else if (error.code === "42P01") {
-          throw new Error("Table 'expenses' does not exist. Please check your database schema.")
-        } else if (error.code === "42703") {
-          throw new Error("Column does not exist in the expenses table. Please check your database schema.")
-        } else if (error.code === "23502") {
-          throw new Error("A required field is missing")
-        } else {
-          throw error
+          if (error) {
+            if (status === 429) {
+              // Rate limit hit - wait and retry
+              const backoffTime = Math.pow(2, retries) * 1000
+              console.warn(`Rate limit hit, retrying in ${backoffTime}ms (attempt ${retries + 1}/${maxRetries})`)
+              await sleep(backoffTime)
+              retries++
+              continue
+            }
+
+            // Handle specific Supabase errors
+            if (error.code === "23505") {
+              throw new Error("This transaction already exists")
+            } else if (error.code === "23503") {
+              throw new Error("Referenced record does not exist")
+            } else if (error.code === "42P01") {
+              throw new Error("Table 'expenses' does not exist. Please check your database schema.")
+            } else if (error.code === "42703") {
+              throw new Error("Column does not exist in the expenses table. Please check your database schema.")
+            } else if (error.code === "23502") {
+              throw new Error("A required field is missing")
+            } else {
+              throw error
+            }
+          }
+
+          if (!data) {
+            throw new Error("No data returned from insert operation")
+          }
+
+          console.log("Transaction added successfully:", {
+            id: data.id,
+            type: data.type,
+            amount: formatCurrency(data.amount),
+          })
+
+          // Add category to cache if it's new
+          if (!categoriesCache[data.type].includes(data.category)) {
+            categoriesCache[data.type].push(data.category)
+          }
+
+          // Invalidate cache
+          expensesCache = null
+          lastFetchTime = 0
+
+          // Return the complete expense with the ID from the database
+          return mapDbExpenseToExpense(data)
+        } catch (error: any) {
+          if (error.status !== 429 || retries >= maxRetries - 1) {
+            throw error
+          }
+          retries++
         }
       }
 
-      if (!data) {
-        throw new Error("No data returned from insert operation")
-      }
-
-      console.log("Transaction added successfully:", {
-        id: data.id,
-        type: data.type,
-        amount: formatCurrency(data.amount),
-      })
-
-      // Add category to cache if it's new
-      if (!categoriesCache[data.type].includes(data.category)) {
-        categoriesCache[data.type].push(data.category)
-      }
-
-      // Invalidate cache
-      expensesCache = null
-
-      // Return the complete expense with the ID from the database
-      return mapDbExpenseToExpense(data)
+      throw new Error("Failed to add expense after multiple attempts")
     } catch (error) {
       console.error("Error in addExpense:", error)
       throw error
@@ -274,33 +361,56 @@ export const expenseService = {
         throw new Error("User not authenticated")
       }
 
-      const { data, error } = await supabase
-        .from("expenses")
-        .update({
-          date: expense.date,
-          type: expense.type,
-          category: expense.category,
-          amount: expense.amount,
-          notes: expense.notes,
-        })
-        .eq("id", expense.id)
-        .select()
-        .single()
+      // Implement retry logic for updating expense
+      let retries = 0
+      const maxRetries = 3
 
-      if (error) {
-        console.error("Error updating expense:", error)
-        throw error
+      while (retries < maxRetries) {
+        try {
+          const { data, error, status } = await supabase
+            .from("expenses")
+            .update({
+              date: expense.date,
+              type: expense.type,
+              category: expense.category,
+              amount: expense.amount,
+              notes: expense.notes,
+            })
+            .eq("id", expense.id)
+            .select()
+            .single()
+
+          if (error) {
+            if (status === 429) {
+              // Rate limit hit - wait and retry
+              const backoffTime = Math.pow(2, retries) * 1000
+              console.warn(`Rate limit hit, retrying in ${backoffTime}ms (attempt ${retries + 1}/${maxRetries})`)
+              await sleep(backoffTime)
+              retries++
+              continue
+            }
+            throw error
+          }
+
+          // Add category to cache if it's new
+          if (!categoriesCache[data.type].includes(data.category)) {
+            categoriesCache[data.type].push(data.category)
+          }
+
+          // Invalidate cache
+          expensesCache = null
+          lastFetchTime = 0
+
+          return mapDbExpenseToExpense(data)
+        } catch (error: any) {
+          if (error.status !== 429 || retries >= maxRetries - 1) {
+            throw error
+          }
+          retries++
+        }
       }
 
-      // Add category to cache if it's new
-      if (!categoriesCache[data.type].includes(data.category)) {
-        categoriesCache[data.type].push(data.category)
-      }
-
-      // Invalidate cache
-      expensesCache = null
-
-      return mapDbExpenseToExpense(data)
+      throw new Error("Failed to update expense after multiple attempts")
     } catch (error) {
       console.error("Error in updateExpense:", error)
       throw error
@@ -325,15 +435,40 @@ export const expenseService = {
         throw new Error("User not authenticated")
       }
 
-      const { error } = await supabase.from("expenses").delete().eq("id", id)
+      // Implement retry logic for deleting expense
+      let retries = 0
+      const maxRetries = 3
 
-      if (error) {
-        console.error("Error deleting expense:", error)
-        throw error
+      while (retries < maxRetries) {
+        try {
+          const { error, status } = await supabase.from("expenses").delete().eq("id", id)
+
+          if (error) {
+            if (status === 429) {
+              // Rate limit hit - wait and retry
+              const backoffTime = Math.pow(2, retries) * 1000
+              console.warn(`Rate limit hit, retrying in ${backoffTime}ms (attempt ${retries + 1}/${maxRetries})`)
+              await sleep(backoffTime)
+              retries++
+              continue
+            }
+            throw error
+          }
+
+          // Invalidate cache
+          expensesCache = null
+          lastFetchTime = 0
+
+          return
+        } catch (error: any) {
+          if (error.status !== 429 || retries >= maxRetries - 1) {
+            throw error
+          }
+          retries++
+        }
       }
 
-      // Invalidate cache
-      expensesCache = null
+      throw new Error("Failed to delete expense after multiple attempts")
     } catch (error) {
       console.error("Error in deleteExpense:", error)
       throw error

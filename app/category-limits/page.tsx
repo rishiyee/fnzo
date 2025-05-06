@@ -80,13 +80,19 @@ export default function CategoryManagementPage() {
       setRecentCategories(recent)
     } catch (error) {
       console.error("Failed to load recent categories:", error)
+      // Don't show error toast to avoid overwhelming the user
+      // Just set an empty array to avoid breaking the UI
+      setRecentCategories([])
     }
   }, [])
 
   // Load recent categories on mount
   useEffect(() => {
     if (user) {
-      loadRecentCategories()
+      loadRecentCategories().catch((err) => {
+        console.error("Error in loadRecentCategories effect:", err)
+        // Silent failure to avoid breaking the UI
+      })
     }
   }, [user, loadRecentCategories])
 

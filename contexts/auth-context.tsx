@@ -105,21 +105,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error }
       }
 
+      // Check if session and user exist in the response
+      if (!data.session || !data.user) {
+        console.error("Sign in error: Auth session or user missing", { data })
+        return {
+          error: {
+            message: "Authentication failed. Please try again.",
+            status: 400,
+            name: "AuthError",
+          } as AuthError,
+        }
+      }
+
       console.log("Sign in successful", {
-        userId: data.user?.id,
+        userId: data.user.id,
         hasSession: !!data.session,
-        expiresAt: data.session?.expires_at ? new Date(data.session.expires_at * 1000).toISOString() : "unknown",
+        expiresAt: data.session.expires_at ? new Date(data.session.expires_at * 1000).toISOString() : "unknown",
       })
 
       // Explicitly set the session and user in state
-      if (data.session) {
-        setSession(data.session)
-        setUser(data.user)
+      setSession(data.session)
+      setUser(data.user)
 
-        // Reset refresh cooldown on successful sign in
-        refreshCooldown.current = 0
-        lastRefreshTime.current = Date.now()
-      }
+      // Reset refresh cooldown on successful sign in
+      refreshCooldown.current = 0
+      lastRefreshTime.current = Date.now()
 
       return { error: null }
     } catch (error) {

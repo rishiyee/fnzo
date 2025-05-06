@@ -34,7 +34,7 @@ type AuthFormProps = {
 
 export function AuthForm({ mode }: AuthFormProps) {
   const [isLoading, setIsLoading] = useState(false)
-  const { signIn, signUp } = useAuth()
+  const { signIn, signUp, verifySession } = useAuth()
   const { toast } = useToast()
   const router = useRouter()
 
@@ -60,8 +60,23 @@ export function AuthForm({ mode }: AuthFormProps) {
           return
         }
 
-        // Add a small delay to ensure the session is properly set
-        await new Promise((resolve) => setTimeout(resolve, 500))
+        // Check if session was successfully created
+        const isSessionValid = await new Promise<boolean>((resolve) => {
+          // Add a small delay to ensure the session is properly set
+          setTimeout(async () => {
+            const valid = await verifySession()
+            resolve(valid)
+          }, 1000)
+        })
+
+        if (!isSessionValid) {
+          toast({
+            title: "Authentication error",
+            description: "Failed to establish a session. Please try again.",
+            variant: "destructive",
+          })
+          return
+        }
 
         toast({
           title: "Success",

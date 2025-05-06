@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+// No Card components needed anymore
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { format, parseISO, startOfMonth, endOfMonth, eachMonthOfInterval, isSameMonth } from "date-fns"
@@ -114,10 +114,10 @@ export function ExpenseGraph({ expenses, className }: ExpenseGraphProps) {
   }
 
   return (
-    <Card className={`w-full ${className}`}>
-      <CardHeader>
-        <CardTitle>Financial Trends</CardTitle>
-        <CardDescription>Track your income, expenses, savings, and balance over time</CardDescription>
+    <div className={`w-full ${className}`}>
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold tracking-tight">Financial Trends</h2>
+        <p className="text-muted-foreground">Track your income, expenses, savings, and balance over time</p>
 
         <div className="flex flex-wrap gap-4 mt-2">
           <div className="flex items-center space-x-2">
@@ -168,9 +168,9 @@ export function ExpenseGraph({ expenses, className }: ExpenseGraphProps) {
             </Label>
           </div>
         </div>
-      </CardHeader>
+      </div>
 
-      <CardContent>
+      <div>
         {graphData.length > 0 ? (
           <div className="w-full h-[300px] mt-4">
             <ResponsiveContainer width="100%" height="100%">
@@ -206,8 +206,8 @@ export function ExpenseGraph({ expenses, className }: ExpenseGraphProps) {
                     name="Income"
                     stroke={seriesColors.income}
                     strokeWidth={2.5}
-                    dot={false} // Removed dots
-                    activeDot={false} // Removed active dots
+                    dot={false}
+                    activeDot={false}
                   />
                 )}
 
@@ -218,8 +218,8 @@ export function ExpenseGraph({ expenses, className }: ExpenseGraphProps) {
                     name="Expense"
                     stroke={seriesColors.expense}
                     strokeWidth={2.5}
-                    dot={false} // Removed dots
-                    activeDot={false} // Removed active dots
+                    dot={false}
+                    activeDot={false}
                   />
                 )}
 
@@ -230,8 +230,8 @@ export function ExpenseGraph({ expenses, className }: ExpenseGraphProps) {
                     name="Savings"
                     stroke={seriesColors.savings}
                     strokeWidth={2.5}
-                    dot={false} // Removed dots
-                    activeDot={false} // Removed active dots
+                    dot={false}
+                    activeDot={false}
                   />
                 )}
 
@@ -242,8 +242,8 @@ export function ExpenseGraph({ expenses, className }: ExpenseGraphProps) {
                     name="Balance"
                     stroke={seriesColors.balance}
                     strokeWidth={2.5}
-                    dot={false} // Removed dots
-                    activeDot={false} // Removed active dots
+                    dot={false}
+                    activeDot={false}
                   />
                 )}
               </LineChart>
@@ -254,7 +254,7 @@ export function ExpenseGraph({ expenses, className }: ExpenseGraphProps) {
             No data available for the selected filters
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

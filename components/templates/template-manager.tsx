@@ -55,17 +55,43 @@ export function TemplateManager() {
     const loadData = async () => {
       try {
         setIsLoading(true)
-        const [templatesData, categoriesData] = await Promise.all([
-          templateService.getTemplates(),
-          expenseService.getCategories(),
-        ])
+
+        // Try to load templates first
+        let templatesData: TransactionTemplate[] = []
+        try {
+          templatesData = await templateService.getTemplates()
+        } catch (error) {
+          console.error("Error loading templates:", error)
+          toast({
+            title: "Warning",
+            description: "Could not load all templates. Some data may be missing.",
+            variant: "destructive",
+          })
+          // Continue with empty templates rather than failing completely
+          templatesData = []
+        }
+
+        // Try to load categories
+        let categoriesData: Record<string, string[]> = { expense: [], income: [], savings: [] }
+        try {
+          categoriesData = await expenseService.getCategories()
+        } catch (error) {
+          console.error("Error loading categories:", error)
+          toast({
+            title: "Warning",
+            description: "Could not load categories. Some functionality may be limited.",
+            variant: "destructive",
+          })
+          // Continue with default empty categories
+        }
+
         setTemplates(templatesData)
         setCategories(categoriesData)
       } catch (error) {
-        console.error("Error loading templates:", error)
+        console.error("Error in loadData:", error)
         toast({
           title: "Error",
-          description: "Failed to load templates. Please try again.",
+          description: "Failed to load data. Please try refreshing the page.",
           variant: "destructive",
         })
       } finally {

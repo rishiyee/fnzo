@@ -1,22 +1,32 @@
 "use client"
 
+import type React from "react"
+
 import { useEffect, useState, useRef, useCallback } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
-import OverviewSummary from "@/components/overview-summary"
 import { OverviewStats } from "@/components/overview-stats"
-import { ExpenseGraph } from "@/components/expense-graph"
-import { ExpenseGraphSkeleton } from "@/components/skeleton/expense-graph-skeleton"
 import { AppLayout } from "@/components/layout/app-layout"
 import { expenseService } from "@/lib/expense-service"
 import { useFilter } from "@/contexts/filter-context"
 import type { Expense } from "@/types/expense"
 import { useToast } from "@/hooks/use-toast"
 import { Header } from "@/components/header"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { UnifiedFilter } from "@/components/unified-filter"
+import { ExpenseTable } from "@/components/expense-table"
+import { ExpenseTableSkeleton } from "@/components/skeleton/expense-table-skeleton"
+import { TransactionModal } from "@/components/transaction-modal"
+import { BulkTransactionModal } from "@/components/bulk-transaction-modal"
+import { Plus, Download, Upload, List } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import OverviewSummary from "@/components/overview-summary"
+import { CATEGORY_UPDATED_EVENT } from "@/lib/category-service"
 
 export default function Home() {
   const { user, isLoading, refreshSession } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [authChecked, setAuthChecked] = useState(false)
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [isLoadingExpenses, setIsLoadingExpenses] = useState(true)
@@ -25,6 +35,28 @@ export default function Home() {
   const addTransactionCallback = useRef<((expense: Expense) => void) | null>(null)
   const addTransactionsCallback = useRef<((expenses: Expense[]) => void) | null>(null)
   const { applyFilters } = useFilter()
+
+  // Transaction page state
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const [sortConfig, setSortConfig] = useState<{
+    key: keyof Expense
+    direction: "ascending" | "descending"
+  } | null>({ key: "date", direction: "descending" })
+
+  // Get the active tab from URL or default to "overview"
+  const tabParam = searchParams?.get("tab")
+  const [activeTab, setActiveTab] = useState(tabParam === "transactions" ? "transactions" : "overview")
+
+  // Update URL when tab changes
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href)
+      url.searchParams.set("tab", activeTab)
+      window.history.replaceState({}, "", url.toString())
+    }
+  }, [activeTab])
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -87,6 +119,40 @@ export default function Home() {
     checkAuth()
   }, [isLoading, user, router, refreshSession])
 
+  // Listen for category updates
+  useEffect(() => {
+    const handleCategoryUpdate = () => {
+      loadExpenses()
+    }
+
+    if (typeof window !== "undefined") {
+      window.addEventListener(CATEGORY_UPDATED_EVENT, handleCategoryUpdate)
+
+      return () => {
+        window.removeEventListener(CATEGORY_UPDATED_EVENT, handleCategoryUpdate)
+      }
+    }
+  }, [])
+
+  const loadExpenses = useCallback(async () => {
+    if (!user) return
+
+    setIsLoadingExpenses(true)
+    try {
+      const data = await expenseService.getExpenses()
+      setExpenses(data)
+    } catch (error) {
+      console.error("Failed to load expenses:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load transactions. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoadingExpenses(false)
+    }
+  }, [user, toast])
+
   // Handle CSV export
   const handleExportCSV = async () => {
     try {
@@ -103,7 +169,7 @@ export default function Home() {
         expense.type,
         expense.category,
         expense.amount.toString(),
-        `"${expense.notes.replace(/"/g, '""')}"`, // Escape quotes in notes
+        `"${expense.notes?.replace(/"/g, '""') || ""}"`, // Escape quotes in notes
       ])
 
       const csvContent = [headers.join(","), ...rows.map((row) => row.join(","))].join("\n")
@@ -361,8 +427,95 @@ export default function Home() {
     }
   }, [])
 
+  // Transaction page functions
+  const handleSort = (key: keyof Expense) => {
+    let direction: "ascending" | "descending" = "ascending"
+
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === "ascending") {
+      direction = "descending"
+    }
+
+    setSortConfig({ key, direction })
+  }
+
+  const updateExpense = async (updatedExpense: Expense) => {
+    try {
+      const expense = await expenseService.updateExpense(updatedExpense)
+      setExpenses((prev) => prev.map((item) => (item.id === expense.id ? expense : item)))
+
+      toast({
+        title: "Success",
+        description: "Transaction updated successfully",
+      })
+    } catch (error: any) {
+      console.error("Failed to update transaction:", error)
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to update transaction. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const deleteExpense = async (id: string) => {
+    try {
+      await expenseService.deleteExpense(id)
+      setExpenses((prev) => prev.filter((expense) => expense.id !== id))
+
+      toast({
+        title: "Success",
+        description: "Transaction deleted successfully",
+      })
+    } catch (error: any) {
+      console.error("Failed to delete transaction:", error)
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to delete transaction. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleImportClick = () => {
+    document.getElementById("csv-file-input")?.click()
+  }
+
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    try {
+      await handleImportCSV(file)
+
+      // Reset file input
+      if (event.target) {
+        event.target.value = ""
+      }
+    } catch (error) {
+      console.error("Import error:", error)
+      toast({
+        title: "Import failed",
+        description: "An error occurred while importing data.",
+        variant: "destructive",
+      })
+    }
+  }
+
   // Get filtered expenses
   const filteredExpenses = applyFilters(expenses)
+
+  // Apply sorting to filtered expenses
+  const sortedFilteredExpenses = [...filteredExpenses].sort((a, b) => {
+    if (!sortConfig) return 0
+
+    if (a[sortConfig.key] < b[sortConfig.key]) {
+      return sortConfig.direction === "ascending" ? -1 : 1
+    }
+    if (a[sortConfig.key] > b[sortConfig.key]) {
+      return sortConfig.direction === "ascending" ? 1 : -1
+    }
+    return 0
+  })
 
   if (isLoading || !authChecked) {
     return (
@@ -379,21 +532,112 @@ export default function Home() {
   return (
     <AppLayout>
       <div className="p-6 w-full">
-        <div className="mb-6 w-full">
-          <h1 className="text-2xl font-bold">Overview</h1>
-          <p className="text-muted-foreground">Welcome back! Here's a summary of your finances.</p>
-        </div>
-        <div className="space-y-8 w-full">
-          <OverviewStats />
+        <div className="flex justify-between items-center mb-6 w-full">
+          <div>
+            <h1 className="text-2xl font-bold">Financial Dashboard</h1>
+            <p className="text-muted-foreground">Manage your finances in one place</p>
+          </div>
+          <div className="flex items-center gap-2 md:gap-3">
+            {/* Add Transaction Button */}
+            <Button onClick={() => setIsModalOpen(true)} className="hidden sm:flex" size="sm">
+              <Plus className="mr-1 h-4 w-4" />
+              Add Transaction
+            </Button>
+            <Button onClick={() => setIsModalOpen(true)} className="sm:hidden" size="icon" variant="outline">
+              <Plus className="h-4 w-4" />
+              <span className="sr-only">Add Transaction</span>
+            </Button>
 
-          {isLoadingExpenses ? <ExpenseGraphSkeleton /> : <ExpenseGraph expenses={filteredExpenses} />}
+            {/* Bulk Add Button */}
+            <Button onClick={() => setIsBulkModalOpen(true)} className="hidden sm:flex" size="sm" variant="outline">
+              <List className="mr-1 h-4 w-4" />
+              Bulk Add
+            </Button>
+            <Button onClick={() => setIsBulkModalOpen(true)} className="sm:hidden" size="icon" variant="outline">
+              <List className="h-4 w-4" />
+              <span className="sr-only">Bulk Add</span>
+            </Button>
 
-          <OverviewSummary
-            onExpensesUpdated={handleExpensesUpdated}
-            onAddTransaction={registerAddTransactionCallback}
-            onAddTransactions={registerAddTransactionsCallback}
-          />
+            {/* Export Button */}
+            <Button onClick={handleExportCSV} className="hidden md:flex" size="sm" variant="outline">
+              <Download className="mr-1 h-4 w-4" />
+              Export
+            </Button>
+            <Button onClick={handleExportCSV} className="md:hidden" size="icon" variant="outline">
+              <Download className="h-4 w-4" />
+              <span className="sr-only">Export</span>
+            </Button>
+
+            {/* Import Button */}
+            <Button onClick={handleImportClick} className="hidden md:flex" size="sm" variant="outline">
+              <Upload className="mr-1 h-4 w-4" />
+              Import
+            </Button>
+            <Button onClick={handleImportClick} className="md:hidden" size="icon" variant="outline">
+              <Upload className="h-4 w-4" />
+              <span className="sr-only">Import</span>
+            </Button>
+            <input
+              id="csv-file-input"
+              type="file"
+              accept=".csv"
+              onChange={handleFileSelect}
+              className="hidden"
+              ref={(el) => (fileInputRef.current = el)}
+            />
+          </div>
         </div>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="transactions">Transactions</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview" className="space-y-6">
+            <OverviewStats />
+            <OverviewSummary
+              onExpensesUpdated={handleExpensesUpdated}
+              onAddTransaction={registerAddTransactionCallback}
+            />
+          </TabsContent>
+
+          <TabsContent value="transactions">
+            <div className="mb-6 w-full">
+              <UnifiedFilter />
+              <div className="mt-2 text-sm text-muted-foreground">
+                {filteredExpenses.length} {filteredExpenses.length === 1 ? "transaction" : "transactions"} found
+              </div>
+            </div>
+
+            {isLoadingExpenses ? (
+              <ExpenseTableSkeleton />
+            ) : (
+              <div className="w-full overflow-x-auto">
+                <ExpenseTable
+                  expenses={sortedFilteredExpenses}
+                  onUpdate={updateExpense}
+                  onDelete={deleteExpense}
+                  onSort={handleSort}
+                  sortConfig={sortConfig}
+                  isLoading={false}
+                />
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+
+        <TransactionModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onTransactionAdded={handleTransactionAdded}
+        />
+
+        <BulkTransactionModal
+          isOpen={isBulkModalOpen}
+          onClose={() => setIsBulkModalOpen(false)}
+          onTransactionsAdded={handleTransactionsAdded}
+        />
       </div>
 
       <Header
