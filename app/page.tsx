@@ -531,6 +531,13 @@ export default function Home() {
 
   return (
     <AppLayout>
+      <Header
+        onExportCSV={handleExportCSV}
+        onImportCSV={handleImportCSV}
+        expenses={expenses}
+        onTransactionAdded={handleTransactionAdded}
+        onTransactionsAdded={handleTransactionsAdded}
+      />
       <div className="p-6 w-full">
         <div className="flex justify-between items-center mb-6 w-full">
           <div>
@@ -639,14 +646,6 @@ export default function Home() {
           onTransactionsAdded={handleTransactionsAdded}
         />
       </div>
-
-      <Header
-        onExportCSV={handleExportCSV}
-        onImportCSV={handleImportCSV}
-        expenses={expenses}
-        onTransactionAdded={handleTransactionAdded}
-        onTransactionsAdded={handleTransactionsAdded}
-      />
     </AppLayout>
   )
 }

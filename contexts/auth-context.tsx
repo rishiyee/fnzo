@@ -105,27 +105,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error }
       }
 
-      // Check if session and user exist in the response
-      if (!data.session || !data.user) {
-        console.error("Sign in error: Auth session or user missing", { data })
+      // Check if session exists in the response
+      if (!data.session) {
+        console.error("Sign in error: Auth session missing", { data })
         return {
           error: {
-            message: "Authentication failed. Please try again.",
+            message: "Authentication failed. No session returned.",
             status: 400,
             name: "AuthError",
           } as AuthError,
         }
       }
 
+      // Check if user exists in the response
+      if (!data.user) {
+        console.error("Sign in error: Auth user missing", { data })
+        // If we have a session but no user, try to get the user
+        try {
+          const { data: userData, error: userError } = await supabase.auth.getUser()
+          if (userError || !userData.user) {
+            return {
+              error: {
+                message: "Authentication failed. User data not available.",
+                status: 400,
+                name: "AuthError",
+              } as AuthError,
+            }
+          }
+          // Set the user from the getUser call
+          setUser(userData.user)
+        } catch (getUserError) {
+          console.error("Error getting user after sign in:", getUserError)
+          return {
+            error: {
+              message: "Authentication failed. Could not retrieve user data.",
+              status: 400,
+              name: "AuthError",
+            } as AuthError,
+          }
+        }
+      } else {
+        // User exists in the response, set it
+        setUser(data.user)
+      }
+
+      // Set the session
+      setSession(data.session)
+
       console.log("Sign in successful", {
-        userId: data.user.id,
+        userId: data.user?.id || "unknown",
         hasSession: !!data.session,
         expiresAt: data.session.expires_at ? new Date(data.session.expires_at * 1000).toISOString() : "unknown",
       })
-
-      // Explicitly set the session and user in state
-      setSession(data.session)
-      setUser(data.user)
 
       // Reset refresh cooldown on successful sign in
       refreshCooldown.current = 0

@@ -57,6 +57,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         const { error } = await signIn(values.email, values.password)
         if (error) {
           handleAuthError(error)
+          setIsLoading(false)
           return
         }
 
@@ -75,6 +76,7 @@ export function AuthForm({ mode }: AuthFormProps) {
             description: "Failed to establish a session. Please try again.",
             variant: "destructive",
           })
+          setIsLoading(false)
           return
         }
 
@@ -89,6 +91,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         const { error } = await signUp(values.email, values.password)
         if (error) {
           handleAuthError(error)
+          setIsLoading(false)
           return
         }
         toast({
@@ -110,16 +113,30 @@ export function AuthForm({ mode }: AuthFormProps) {
 
   // Handle authentication errors
   const handleAuthError = (error: any) => {
+    console.error("Authentication error:", error)
+
     if (error.status === 429) {
       toast({
         title: "Too many attempts",
         description: "Please try again later.",
         variant: "destructive",
       })
-    } else if (error.message?.includes("credentials")) {
+    } else if (error.message?.includes("credentials") || error.message?.includes("Invalid login")) {
       toast({
         title: "Invalid credentials",
         description: "Please check your email and password.",
+        variant: "destructive",
+      })
+    } else if (error.message?.includes("session")) {
+      toast({
+        title: "Session error",
+        description: "Could not establish a session. Please try again.",
+        variant: "destructive",
+      })
+    } else if (error.message?.includes("user")) {
+      toast({
+        title: "User data error",
+        description: "Could not retrieve user information. Please try again.",
         variant: "destructive",
       })
     } else {

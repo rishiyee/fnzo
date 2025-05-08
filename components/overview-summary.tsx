@@ -5,10 +5,11 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
-import { ExpenseTracker } from "@/components/expense-tracker"
+import { MinimalTransactionTable } from "@/components/minimal-transaction-table"
 import { TransactionModal } from "@/components/transaction-modal"
 import { expenseService } from "@/lib/expense-service"
 import { useToast } from "@/hooks/use-toast"
+import { useRouter } from "next/navigation"
 import type { Expense } from "@/types/expense"
 
 interface OverviewSummaryProps {
@@ -22,6 +23,7 @@ export default function OverviewSummary({ onExpensesUpdated, onAddTransaction }:
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const { toast } = useToast()
+  const router = useRouter()
 
   const loadExpenses = useCallback(async () => {
     try {
@@ -54,20 +56,52 @@ export default function OverviewSummary({ onExpensesUpdated, onAddTransaction }:
     }
   }
 
-  const handleTransactionUpdated = (updatedExpense: Expense) => {
-    const updatedExpenses = expenses.map((expense) => (expense.id === updatedExpense.id ? updatedExpense : expense))
-    setExpenses(updatedExpenses)
-    if (onExpensesUpdated) {
-      onExpensesUpdated(updatedExpenses)
+  const handleTransactionUpdated = async (updatedExpense: Expense) => {
+    try {
+      const expense = await expenseService.updateExpense(updatedExpense)
+      const updatedExpenses = expenses.map((e) => (e.id === expense.id ? expense : e))
+      setExpenses(updatedExpenses)
+      if (onExpensesUpdated) {
+        onExpensesUpdated(updatedExpenses)
+      }
+      toast({
+        title: "Success",
+        description: "Transaction updated successfully",
+      })
+    } catch (error: any) {
+      console.error("Failed to update transaction:", error)
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to update transaction. Please try again.",
+        variant: "destructive",
+      })
     }
   }
 
-  const handleTransactionDeleted = (id: string) => {
-    const updatedExpenses = expenses.filter((expense) => expense.id !== id)
-    setExpenses(updatedExpenses)
-    if (onExpensesUpdated) {
-      onExpensesUpdated(updatedExpenses)
+  const handleTransactionDeleted = async (id: string) => {
+    try {
+      await expenseService.deleteExpense(id)
+      const updatedExpenses = expenses.filter((expense) => expense.id !== id)
+      setExpenses(updatedExpenses)
+      if (onExpensesUpdated) {
+        onExpensesUpdated(updatedExpenses)
+      }
+      toast({
+        title: "Success",
+        description: "Transaction deleted successfully",
+      })
+    } catch (error: any) {
+      console.error("Failed to delete transaction:", error)
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to delete transaction. Please try again.",
+        variant: "destructive",
+      })
     }
+  }
+
+  const handleViewAll = () => {
+    router.push("/?tab=transactions")
   }
 
   return (
@@ -94,36 +128,39 @@ export default function OverviewSummary({ onExpensesUpdated, onAddTransaction }:
             </TabsList>
           </div>
 
-          <TabsContent value="recent" className="m-0">
-            <ExpenseTracker
+          <TabsContent value="recent" className="m-0 p-6">
+            <MinimalTransactionTable
               expenses={expenses}
               isLoading={isLoading}
               onUpdate={handleTransactionUpdated}
               onDelete={handleTransactionDeleted}
-              onAddTransaction={onAddTransaction}
               limit={5}
+              showViewAll={true}
+              onViewAll={handleViewAll}
             />
           </TabsContent>
 
-          <TabsContent value="expense" className="m-0">
-            <ExpenseTracker
+          <TabsContent value="expense" className="m-0 p-6">
+            <MinimalTransactionTable
               expenses={expenses.filter((expense) => expense.type === "expense")}
               isLoading={isLoading}
               onUpdate={handleTransactionUpdated}
               onDelete={handleTransactionDeleted}
-              onAddTransaction={onAddTransaction}
               limit={5}
+              showViewAll={true}
+              onViewAll={handleViewAll}
             />
           </TabsContent>
 
-          <TabsContent value="income" className="m-0">
-            <ExpenseTracker
+          <TabsContent value="income" className="m-0 p-6">
+            <MinimalTransactionTable
               expenses={expenses.filter((expense) => expense.type === "income")}
               isLoading={isLoading}
               onUpdate={handleTransactionUpdated}
               onDelete={handleTransactionDeleted}
-              onAddTransaction={onAddTransaction}
               limit={5}
+              showViewAll={true}
+              onViewAll={handleViewAll}
             />
           </TabsContent>
         </Tabs>

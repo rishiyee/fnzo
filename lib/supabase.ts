@@ -4,24 +4,24 @@ import type { Database } from "@/types/supabase"
 // Create a single supabase client for the browser
 let browserClient: ReturnType<typeof createClient> | null = null
 
-// Update the getSupabaseBrowserClient function to handle initialization errors better
-export const getSupabaseBrowserClient = () => {
+// Update the getSupabaseBrowserClient function with better error handling
+export function getSupabaseBrowserClient() {
   if (browserClient) return browserClient
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.error("Supabase URL or Anon Key is missing")
-    throw new Error("Supabase configuration is incomplete")
-  }
-
-  console.log("Initializing Supabase client with:", {
-    url: supabaseUrl,
-    keyLength: supabaseAnonKey.length, // Log key length for debugging without exposing the key
-  })
-
   try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.error("Supabase environment variables are missing")
+      throw new Error("Supabase configuration error")
+    }
+
+    console.log("Initializing Supabase client with:", {
+      url: supabaseUrl,
+      keyLength: supabaseAnonKey.length, // Log key length for debugging without exposing the key
+    })
+
     browserClient = createClient<Database>(supabaseUrl, supabaseAnonKey, {
       auth: {
         persistSession: true,
@@ -29,7 +29,6 @@ export const getSupabaseBrowserClient = () => {
         detectSessionInUrl: true,
         storageKey: "fnzo-supabase-auth",
         flowType: "pkce",
-        debug: false, // Disable debug mode to reduce console noise
       },
       global: {
         // Add fetch options with retry and timeout
@@ -57,10 +56,11 @@ export const getSupabaseBrowserClient = () => {
       }
     })
 
+    console.log("Supabase browser client initialized successfully")
     return browserClient
   } catch (error) {
-    console.error("Error creating Supabase client:", error)
-    throw new Error("Failed to initialize Supabase client")
+    console.error("Error initializing Supabase browser client:", error)
+    throw error
   }
 }
 
