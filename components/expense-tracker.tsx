@@ -21,7 +21,7 @@ import { ExpenseTableSkeleton } from "@/components/skeleton/expense-table-skelet
 import type { Expense } from "@/types/expense"
 
 interface ExpenseTrackerProps {
-  expenses: Expense[]
+  expenses?: Expense[]
   isLoading?: boolean
   onUpdate?: (expense: Expense) => void
   onDelete?: (id: string) => void
@@ -30,7 +30,7 @@ interface ExpenseTrackerProps {
 }
 
 export function ExpenseTracker({
-  expenses,
+  expenses = [],
   isLoading = false,
   onUpdate,
   onDelete,
@@ -98,7 +98,7 @@ export function ExpenseTracker({
     return <ExpenseTableSkeleton />
   }
 
-  if (expenses.length === 0) {
+  if (!expenses || expenses.length === 0) {
     return (
       <div className="text-center py-12 w-full">
         <h3 className="text-lg font-medium">No transactions found</h3>

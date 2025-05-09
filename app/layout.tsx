@@ -8,6 +8,7 @@ import { AuthProvider } from "@/contexts/auth-context"
 import { FilterProvider } from "@/contexts/filter-context"
 import { VisibilityProvider } from "@/contexts/visibility-context"
 import { CategoryProvider } from "@/contexts/category-context"
+import { Header } from "@/components/header"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -26,7 +27,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <FilterProvider>
               <VisibilityProvider>
                 <CategoryProvider>
-                  {children}
+                  <Header />
+                  <main className="min-h-screen">{children}</main>
                   <Toaster />
                 </CategoryProvider>
               </VisibilityProvider>
