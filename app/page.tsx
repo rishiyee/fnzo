@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { OverviewStats } from "@/components/overview-stats"
-import OverviewSummary from "@/components/overview-summary"
 import { ExpenseTracker } from "@/components/expense-tracker"
 import { expenseService } from "@/lib/expense-service"
 import { useToast } from "@/hooks/use-toast"
@@ -128,20 +127,7 @@ export default function Home() {
         </LimitedWidthTabsList>
         <LimitedWidthTabsContent value="overview">
           <OverviewStats />
-          <OverviewSummary
-            onExpensesUpdated={setExpenses}
-            onAddTransaction={(callback) => {
-              // Store the callback for later use
-              if (callback) {
-                const wrappedCallback = (expense: Expense) => {
-                  callback(expense)
-                  handleTransactionAdded(expense)
-                }
-                return wrappedCallback
-              }
-              return null
-            }}
-          />
+          {/* Removed the OverviewSummary component that contained the Recent Transactions */}
         </LimitedWidthTabsContent>
         <LimitedWidthTabsContent value="transactions">
           <ExpenseTracker

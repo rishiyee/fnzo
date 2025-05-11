@@ -1,7 +1,7 @@
 "use client"
 
 import { usePathname, useRouter } from "next/navigation"
-import { LayoutDashboard, Tags, FileIcon, BarChart3, Settings, Menu, X, ChevronDown } from "lucide-react"
+import { LayoutDashboard, FileIcon, BarChart3, Settings, Menu, X, ChevronDown } from "lucide-react"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -34,10 +34,9 @@ export function Header() {
     return pathname?.startsWith(path)
   }
 
-  // Navigation items
+  // Navigation items - Removed Category Limits
   const navItems = [
     { href: "/", icon: <LayoutDashboard className="h-4 w-4 mr-2" />, label: "Dashboard" },
-    { href: "/category-limits", icon: <Tags className="h-4 w-4 mr-2" />, label: "Categories" },
     { href: "/templates", icon: <FileIcon className="h-4 w-4 mr-2" />, label: "Templates" },
     { href: "/monthly-summary", icon: <BarChart3 className="h-4 w-4 mr-2" />, label: "Monthly Summary" },
   ]
@@ -49,15 +48,15 @@ export function Header() {
 
   return (
     <>
-      {/* Fixed Header */}
+      {/* Fixed Header - Now 100% width */}
       <header
         className={cn(
-          "fixed top-0 left-0 right-0 z-50 transition-all duration-200",
+          "fixed top-0 left-0 right-0 z-50 transition-all duration-200 w-full",
           scrolled ? "bg-background/95 backdrop-blur-sm shadow-sm" : "bg-background",
         )}
       >
-        {/* Desktop Header */}
-        <div className="hidden md:flex items-center justify-between px-6 py-3 max-w-7xl mx-auto">
+        {/* Desktop Header - Removed max-width constraint */}
+        <div className="hidden md:flex items-center justify-between px-6 py-3 w-full">
           <div className="flex items-center space-x-1">
             <h1 className="text-xl font-bold mr-6 cursor-pointer flex items-center" onClick={() => router.push("/")}>
               <span className="bg-primary text-primary-foreground px-2 py-1 rounded mr-2">F</span>
@@ -93,6 +92,7 @@ export function Header() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={() => router.push("/settings/profile")}>Profile</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => router.push("/settings/categories")}>Categories</DropdownMenuItem>
                   <DropdownMenuItem onClick={() => router.push("/settings/preferences")}>Preferences</DropdownMenuItem>
                   <DropdownMenuItem onClick={() => signOut()}>Sign out</DropdownMenuItem>
                 </DropdownMenuContent>
@@ -105,8 +105,8 @@ export function Header() {
           </div>
         </div>
 
-        {/* Mobile Header */}
-        <div className="md:hidden flex items-center justify-between px-4 py-3">
+        {/* Mobile Header - Full width */}
+        <div className="md:hidden flex items-center justify-between px-4 py-3 w-full">
           <h1 className="text-xl font-bold cursor-pointer flex items-center" onClick={() => router.push("/")}>
             <span className="bg-primary text-primary-foreground px-2 py-1 rounded mr-2">F</span>
             <span>Fnzo</span>

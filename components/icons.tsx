@@ -9,7 +9,7 @@ import {
   File,
   FileText,
   HelpCircle,
-  Image,
+  ImageIcon,
   Laptop,
   Loader2,
   type LightbulbIcon as LucideProps,
@@ -67,6 +67,6 @@ export const Icons = {
   creditCard: CreditCard,
   file: File,
   fileText: FileText,
-  image: Image,
+  image: ImageIcon,
   plus: Plus,
 }
