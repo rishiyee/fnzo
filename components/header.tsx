@@ -1,19 +1,24 @@
 "use client"
 
 import { usePathname, useRouter } from "next/navigation"
-import { LayoutDashboard, FileIcon, BarChart3, Settings, Menu, X, ChevronDown } from "lucide-react"
-import { useState, useEffect } from "react"
+import { LayoutDashboard, FileIcon, BarChart3, Settings, Menu, X, ChevronDown, Plus } from "lucide-react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useAuth } from "@/contexts/auth-context"
+import { TransactionModal } from "@/components/transaction-modal"
+import { BulkTransactionModal } from "@/components/bulk-transaction-modal"
+import type { Expense } from "@/types/expense"
 
 export function Header() {
   const pathname = usePathname()
   const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
+  const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false)
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false)
   const { user, signOut } = useAuth()
 
   // Handle scroll effect for header
@@ -27,12 +32,15 @@ export function Header() {
   }, [])
 
   // Check if a link is active
-  const isActive = (path: string) => {
-    if (path === "/") {
-      return pathname === path
-    }
-    return pathname?.startsWith(path)
-  }
+  const isActive = useCallback(
+    (path: string) => {
+      if (path === "/") {
+        return pathname === path
+      }
+      return pathname?.startsWith(path)
+    },
+    [pathname],
+  )
 
   // Navigation items - Removed Category Limits
   const navItems = [
@@ -41,10 +49,26 @@ export function Header() {
     { href: "/monthly-summary", icon: <BarChart3 className="h-4 w-4 mr-2" />, label: "Monthly Summary" },
   ]
 
-  const handleNavigation = (path: string) => {
-    router.push(path)
-    setIsMobileMenuOpen(false)
-  }
+  const handleNavigation = useCallback(
+    (path: string) => {
+      router.push(path)
+      setIsMobileMenuOpen(false)
+    },
+    [router],
+  )
+
+  // Use useCallback for these handlers to prevent unnecessary re-renders
+  const handleTransactionAdded = useCallback((expense: Expense) => {
+    // This is just a placeholder. In a real app, you'd want to update your state or refetch data
+    console.log("Transaction added:", expense)
+    // We're not updating any state here, so this shouldn't cause re-renders
+  }, [])
+
+  const handleTransactionsAdded = useCallback((expenses: Expense[]) => {
+    // This is just a placeholder. In a real app, you'd want to update your state or refetch data
+    console.log("Transactions added:", expenses)
+    // We're not updating any state here, so this shouldn't cause re-renders
+  }, [])
 
   return (
     <>
@@ -77,6 +101,12 @@ export function Header() {
           </div>
 
           <div className="flex items-center space-x-2">
+            {user && (
+              <Button size="sm" className="flex items-center gap-1" onClick={() => setIsTransactionModalOpen(true)}>
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline">New Transaction</span>
+              </Button>
+            )}
             <ThemeToggle />
 
             {user ? (
@@ -112,6 +142,11 @@ export function Header() {
             <span>Fnzo</span>
           </h1>
           <div className="flex items-center">
+            {user && (
+              <Button variant="ghost" size="icon" onClick={() => setIsTransactionModalOpen(true)} className="mr-1">
+                <Plus className="h-5 w-5" />
+              </Button>
+            )}
             <ThemeToggle />
             <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(true)}>
               <Menu className="h-5 w-5" />
@@ -198,6 +233,23 @@ export function Header() {
               )}
             </nav>
           </div>
+        </>
+      )}
+
+      {/* Transaction Modal */}
+      {user && (
+        <>
+          <TransactionModal
+            isOpen={isTransactionModalOpen}
+            onClose={() => setIsTransactionModalOpen(false)}
+            onTransactionAdded={handleTransactionAdded}
+          />
+
+          <BulkTransactionModal
+            isOpen={isBulkModalOpen}
+            onClose={() => setIsBulkModalOpen(false)}
+            onTransactionsAdded={handleTransactionsAdded}
+          />
         </>
       )}
     </>

@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { OverviewStats } from "@/components/overview-stats"
-import { ExpenseTracker } from "@/components/expense-tracker"
 import { expenseService } from "@/lib/expense-service"
 import { useToast } from "@/hooks/use-toast"
 import type { Expense } from "@/types/expense"
@@ -15,6 +14,11 @@ import {
   LimitedWidthTabsContent,
 } from "@/components/ui/limited-width-tabs"
 import { useTabParams } from "@/hooks/use-tab-params"
+import { MinimalTransactionTable } from "@/components/minimal-transaction-table"
+import { TransactionModal } from "@/components/transaction-modal"
+import { BulkTransactionModal } from "@/components/bulk-transaction-modal"
+import { Button } from "@/components/ui/button"
+import { Plus } from "lucide-react"
 
 export default function Home() {
   const { user, isLoading } = useAuth()
@@ -23,19 +27,23 @@ export default function Home() {
   const [isClient, setIsClient] = useState(false)
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [isLoadingExpenses, setIsLoadingExpenses] = useState(true)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false)
   const { toast } = useToast()
 
+  // Set isClient to true once on the client side
   useEffect(() => {
     setIsClient(true)
   }, [])
 
+  // Redirect to auth page if not logged in
   useEffect(() => {
     if (!isLoading && !user) {
       router.push("/auth")
     }
   }, [user, isLoading, router])
 
-  // Load expenses when the component mounts
+  // Load expenses when the component mounts or user changes
   useEffect(() => {
     const loadExpenses = async () => {
       if (!user) return
@@ -62,48 +70,59 @@ export default function Home() {
   }, [user, toast])
 
   // Handle expense updates
-  const updateExpense = async (updatedExpense: Expense) => {
-    try {
-      const expense = await expenseService.updateExpense(updatedExpense)
-      setExpenses((prev) => prev.map((item) => (item.id === expense.id ? expense : item)))
+  const updateExpense = useCallback(
+    async (updatedExpense: Expense) => {
+      try {
+        const expense = await expenseService.updateExpense(updatedExpense)
+        setExpenses((prev) => prev.map((item) => (item.id === expense.id ? expense : item)))
 
-      toast({
-        title: "Success",
-        description: "Transaction updated successfully",
-      })
-    } catch (error: any) {
-      console.error("Failed to update transaction:", error)
-      toast({
-        title: "Error",
-        description: error?.message || "Failed to update transaction. Please try again.",
-        variant: "destructive",
-      })
-    }
-  }
+        toast({
+          title: "Success",
+          description: "Transaction updated successfully",
+        })
+      } catch (error: any) {
+        console.error("Failed to update transaction:", error)
+        toast({
+          title: "Error",
+          description: error?.message || "Failed to update transaction. Please try again.",
+          variant: "destructive",
+        })
+      }
+    },
+    [toast],
+  )
 
   // Handle expense deletion
-  const deleteExpense = async (id: string) => {
-    try {
-      await expenseService.deleteExpense(id)
-      setExpenses((prev) => prev.filter((expense) => expense.id !== id))
+  const deleteExpense = useCallback(
+    async (id: string) => {
+      try {
+        await expenseService.deleteExpense(id)
+        setExpenses((prev) => prev.filter((expense) => expense.id !== id))
 
-      toast({
-        title: "Success",
-        description: "Transaction deleted successfully",
-      })
-    } catch (error: any) {
-      console.error("Failed to delete transaction:", error)
-      toast({
-        title: "Error",
-        description: error?.message || "Failed to delete transaction. Please try again.",
-        variant: "destructive",
-      })
-    }
-  }
+        toast({
+          title: "Success",
+          description: "Transaction deleted successfully",
+        })
+      } catch (error: any) {
+        console.error("Failed to delete transaction:", error)
+        toast({
+          title: "Error",
+          description: error?.message || "Failed to delete transaction. Please try again.",
+          variant: "destructive",
+        })
+      }
+    },
+    [toast],
+  )
 
   // Handle transaction added
   const handleTransactionAdded = useCallback((expense: Expense) => {
     setExpenses((prev) => [expense, ...prev])
+  }, [])
+
+  // Handle multiple transactions added
+  const handleTransactionsAdded = useCallback((newExpenses: Expense[]) => {
+    setExpenses((prev) => [...newExpenses, ...prev])
   }, [])
 
   if (isLoading || !user) {
@@ -127,17 +146,46 @@ export default function Home() {
         </LimitedWidthTabsList>
         <LimitedWidthTabsContent value="overview">
           <OverviewStats />
-          {/* Removed the OverviewSummary component that contained the Recent Transactions */}
         </LimitedWidthTabsContent>
         <LimitedWidthTabsContent value="transactions">
-          <ExpenseTracker
-            expenses={expenses}
-            isLoading={isLoadingExpenses}
-            onUpdate={updateExpense}
-            onDelete={deleteExpense}
-          />
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-semibold">All Transactions</h2>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setIsModalOpen(true)} size="sm">
+                  Add Transaction
+                </Button>
+                <Button onClick={() => setIsBulkModalOpen(true)} size="sm">
+                  <Plus className="mr-1 h-4 w-4" /> Add Multiple
+                </Button>
+              </div>
+            </div>
+            <div className="rounded-lg border bg-card">
+              <div className="p-6">
+                <MinimalTransactionTable
+                  expenses={expenses}
+                  onUpdate={updateExpense}
+                  onDelete={deleteExpense}
+                  isLoading={isLoadingExpenses}
+                  showViewAll={false}
+                />
+              </div>
+            </div>
+          </div>
         </LimitedWidthTabsContent>
       </LimitedWidthTabs>
+
+      <TransactionModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onTransactionAdded={handleTransactionAdded}
+      />
+
+      <BulkTransactionModal
+        isOpen={isBulkModalOpen}
+        onClose={() => setIsBulkModalOpen(false)}
+        onTransactionsAdded={handleTransactionsAdded}
+      />
     </div>
   )
 }

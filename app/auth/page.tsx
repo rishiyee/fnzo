@@ -5,8 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { useAuth } from "@/contexts/auth-context"
 import { AuthForm } from "@/components/auth/auth-form"
-import { Wallet } from "lucide-react"
-import { ThemeToggle } from "@/components/theme-toggle"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 
@@ -36,14 +34,6 @@ export default function AuthPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="flex h-16 items-center justify-between px-4 md:px-6 border-b">
-        <Link href="/" className="flex items-center space-x-2">
-          <Wallet className="h-6 w-6" />
-          <span className="text-xl font-bold">Fnzo</span>
-        </Link>
-        <ThemeToggle />
-      </header>
-
       <main className="flex-1 flex items-center justify-center p-4 md:p-8 bg-muted/40">
         <Card className="w-full max-w-md shadow-lg">
           <CardHeader className="space-y-1">

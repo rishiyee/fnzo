@@ -74,3 +74,19 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Hide scrollbars but keep functionality */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+*::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+/* Ensure content is still scrollable */
+html,
+body {
+  overflow-y: auto;
+}

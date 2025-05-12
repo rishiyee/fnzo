@@ -1,66 +1,59 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Check, ChevronsUpDown } from "lucide-react"
 import { cn } from "@/lib/utils"
-
-type Category = {
-  id: string
-  name: string
-  type: string
-  usage_count: number
-  last_used: string
-  color: string
-  icon: string
-}
+import { useCategories } from "@/contexts/category-context"
 
 interface CategorySelectorProps {
-  type: "income" | "expense"
+  id?: string
+  type: "income" | "expense" | "savings"
   value: string
   onChange: (value: string) => void
-  categories: Category[]
 }
 
-export function CategorySelector({ type, value, onChange, categories }: CategorySelectorProps) {
+export function CategorySelector({ id, type, value, onChange }: CategorySelectorProps) {
   const [open, setOpen] = useState(false)
-  const [sortedCategories, setSortedCategories] = useState<Category[]>([])
+  const { categories, isLoading } = useCategories()
 
-  // Sort categories by usage count (most used first) then by last used (most recent first)
-  useEffect(() => {
-    if (categories) {
-      const filtered = categories.filter((cat) => cat.type === type)
-      const sorted = [...filtered].sort((a, b) => {
+  // Use useMemo to filter and sort categories to prevent recalculation on every render
+  const sortedCategories = useMemo(() => {
+    if (!categories || categories.length === 0) return []
+
+    return categories
+      .filter((cat) => cat.type === type)
+      .sort((a, b) => {
         // First sort by usage count (descending)
-        if (b.usage_count !== a.usage_count) {
-          return b.usage_count - a.usage_count
+        if ((b.usageCount || 0) !== (a.usageCount || 0)) {
+          return (b.usageCount || 0) - (a.usageCount || 0)
         }
         // Then by last used date (most recent first)
-        const dateA = a.last_used ? new Date(a.last_used).getTime() : 0
-        const dateB = b.last_used ? new Date(b.last_used).getTime() : 0
+        const dateA = a.lastUsed ? new Date(a.lastUsed).getTime() : 0
+        const dateB = b.lastUsed ? new Date(b.lastUsed).getTime() : 0
         return dateB - dateA
       })
-      setSortedCategories(sorted)
-    }
   }, [categories, type])
 
-  const selectedCategory = categories.find((cat) => cat.name === value)
+  // Use useMemo to find the selected category to prevent recalculation on every render
+  const selectedCategory = useMemo(() => {
+    if (!categories || categories.length === 0) return undefined
+    return categories.find((cat) => cat.name === value && cat.type === type)
+  }, [categories, value, type])
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between">
+        <Button variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between" id={id}>
           {selectedCategory ? (
             <div className="flex items-center gap-2">
-              {selectedCategory.icon && (
+              {selectedCategory.color && (
                 <span
-                  className="flex h-5 w-5 items-center justify-center rounded-full"
+                  className="flex h-3 w-3 rounded-full"
                   style={{ backgroundColor: selectedCategory.color || "#cbd5e1" }}
-                >
-                  {selectedCategory.icon}
-                </span>
+                />
               )}
               <span>{selectedCategory.name}</span>
             </div>
@@ -76,29 +69,31 @@ export function CategorySelector({ type, value, onChange, categories }: Category
           <CommandList>
             <CommandEmpty>No category found.</CommandEmpty>
             <CommandGroup>
-              {sortedCategories.map((category) => (
-                <CommandItem
-                  key={category.id}
-                  value={category.name}
-                  onSelect={(currentValue) => {
-                    onChange(currentValue === value ? "" : currentValue)
-                    setOpen(false)
-                  }}
-                >
-                  <Check className={cn("mr-2 h-4 w-4", value === category.name ? "opacity-100" : "opacity-0")} />
-                  <div className="flex items-center gap-2">
-                    {category.icon && (
-                      <span
-                        className="flex h-5 w-5 items-center justify-center rounded-full"
-                        style={{ backgroundColor: category.color || "#cbd5e1" }}
-                      >
-                        {category.icon}
-                      </span>
-                    )}
-                    <span>{category.name}</span>
-                  </div>
-                </CommandItem>
-              ))}
+              {isLoading ? (
+                <div className="py-6 text-center text-sm text-muted-foreground">Loading categories...</div>
+              ) : (
+                sortedCategories.map((category) => (
+                  <CommandItem
+                    key={category.id}
+                    value={category.name}
+                    onSelect={(currentValue) => {
+                      onChange(currentValue === value ? "" : currentValue)
+                      setOpen(false)
+                    }}
+                  >
+                    <Check className={cn("mr-2 h-4 w-4", value === category.name ? "opacity-100" : "opacity-0")} />
+                    <div className="flex items-center gap-2">
+                      {category.color && (
+                        <span
+                          className="flex h-3 w-3 rounded-full"
+                          style={{ backgroundColor: category.color || "#cbd5e1" }}
+                        />
+                      )}
+                      <span>{category.name}</span>
+                    </div>
+                  </CommandItem>
+                ))
+              )}
             </CommandGroup>
           </CommandList>
         </Command>

@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react"
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from "react"
 import { categoryService, type Category } from "@/lib/category-service"
 import { useAuth } from "@/contexts/auth-context"
 
@@ -35,6 +35,7 @@ export function CategoryProvider({ children }: { children: ReactNode }) {
   const [categoryMap, setCategoryMap] = useState<CategoryMap>({ byId: {}, byNameAndType: {} })
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [lastRefreshTime, setLastRefreshTime] = useState(0)
 
   // Function to update the category map
   const updateCategoryMap = useCallback(() => {
@@ -51,8 +52,16 @@ export function CategoryProvider({ children }: { children: ReactNode }) {
 
   // Function to refresh categories
   const refreshCategories = useCallback(async () => {
+    // Prevent multiple refreshes in a short time period
+    const now = Date.now()
+    if (now - lastRefreshTime < 2000) {
+      console.log("Skipping refresh - too soon since last refresh")
+      return
+    }
+
     setIsLoading(true)
     setError(null)
+    setLastRefreshTime(now)
 
     try {
       console.log("Refreshing categories in context...")
@@ -65,14 +74,43 @@ export function CategoryProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [lastRefreshTime])
 
   // Load categories on mount and when user changes
   useEffect(() => {
-    if (user) {
-      refreshCategories()
+    let isMounted = true
+
+    const loadCategories = async () => {
+      if (!user) return
+
+      setIsLoading(true)
+      setError(null)
+
+      try {
+        console.log("Loading categories in context...")
+        const categoriesWithSpending = await categoryService.getAllCategoriesWithSpending()
+        if (isMounted) {
+          console.log(`Retrieved ${categoriesWithSpending.length} categories with spending data`)
+          setCategories(categoriesWithSpending)
+        }
+      } catch (error: any) {
+        console.error("Error loading categories:", error)
+        if (isMounted) {
+          setError(error.message || "Failed to load categories")
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false)
+        }
+      }
     }
-  }, [user, refreshCategories])
+
+    loadCategories()
+
+    return () => {
+      isMounted = false
+    }
+  }, [user])
 
   // Update category map when categories change
   useEffect(() => {
@@ -121,17 +159,29 @@ export function CategoryProvider({ children }: { children: ReactNode }) {
     [categoryMap],
   )
 
-  // Context value
-  const value = {
-    categories,
-    isLoading,
-    error,
-    refreshCategories,
-    getCategoryName,
-    getCategoryById,
-    getCategoryByName,
-    updateCategoryMap,
-  }
+  // Context value - use useMemo to prevent unnecessary re-renders
+  const value = useMemo(
+    () => ({
+      categories,
+      isLoading,
+      error,
+      refreshCategories,
+      getCategoryName,
+      getCategoryById,
+      getCategoryByName,
+      updateCategoryMap,
+    }),
+    [
+      categories,
+      isLoading,
+      error,
+      refreshCategories,
+      getCategoryName,
+      getCategoryById,
+      getCategoryByName,
+      updateCategoryMap,
+    ],
+  )
 
   return <CategoryContext.Provider value={value}>{children}</CategoryContext.Provider>
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -25,6 +25,7 @@ export default function OverviewSummary({ onExpensesUpdated, onAddTransaction }:
   const { toast } = useToast()
   const router = useRouter()
 
+  // Use useCallback to prevent this function from being recreated on every render
   const loadExpenses = useCallback(async () => {
     try {
       setIsLoading(true)
@@ -45,64 +46,108 @@ export default function OverviewSummary({ onExpensesUpdated, onAddTransaction }:
     }
   }, [onExpensesUpdated, toast])
 
+  // Load expenses only once when the component mounts
   useEffect(() => {
-    loadExpenses()
-  }, [loadExpenses])
+    let isMounted = true
 
-  const handleTransactionAdded = (expense: Expense) => {
-    setExpenses((prev) => [expense, ...prev])
-    if (onExpensesUpdated) {
-      onExpensesUpdated([expense, ...expenses])
-    }
-  }
-
-  const handleTransactionUpdated = async (updatedExpense: Expense) => {
-    try {
-      const expense = await expenseService.updateExpense(updatedExpense)
-      const updatedExpenses = expenses.map((e) => (e.id === expense.id ? expense : e))
-      setExpenses(updatedExpenses)
-      if (onExpensesUpdated) {
-        onExpensesUpdated(updatedExpenses)
+    const fetchExpenses = async () => {
+      try {
+        const data = await expenseService.getExpenses()
+        if (isMounted) {
+          setExpenses(data)
+          if (onExpensesUpdated) {
+            onExpensesUpdated(data)
+          }
+          setIsLoading(false)
+        }
+      } catch (error) {
+        console.error("Failed to load expenses:", error)
+        if (isMounted) {
+          toast({
+            title: "Error",
+            description: "Failed to load transactions. Please try again.",
+            variant: "destructive",
+          })
+          setIsLoading(false)
+        }
       }
-      toast({
-        title: "Success",
-        description: "Transaction updated successfully",
-      })
-    } catch (error: any) {
-      console.error("Failed to update transaction:", error)
-      toast({
-        title: "Error",
-        description: error?.message || "Failed to update transaction. Please try again.",
-        variant: "destructive",
-      })
     }
-  }
 
-  const handleTransactionDeleted = async (id: string) => {
-    try {
-      await expenseService.deleteExpense(id)
-      const updatedExpenses = expenses.filter((expense) => expense.id !== id)
-      setExpenses(updatedExpenses)
+    fetchExpenses()
+
+    return () => {
+      isMounted = false
+    }
+  }, [onExpensesUpdated, toast])
+
+  // Use useCallback for these handlers to prevent them from being recreated on every render
+  const handleTransactionAdded = useCallback(
+    (expense: Expense) => {
+      setExpenses((prev) => [expense, ...prev])
       if (onExpensesUpdated) {
-        onExpensesUpdated(updatedExpenses)
+        onExpensesUpdated((prev) => [expense, ...prev])
       }
-      toast({
-        title: "Success",
-        description: "Transaction deleted successfully",
-      })
-    } catch (error: any) {
-      console.error("Failed to delete transaction:", error)
-      toast({
-        title: "Error",
-        description: error?.message || "Failed to delete transaction. Please try again.",
-        variant: "destructive",
-      })
-    }
-  }
+    },
+    [onExpensesUpdated],
+  )
 
-  const handleViewAll = () => {
+  const handleTransactionUpdated = useCallback(
+    async (updatedExpense: Expense) => {
+      try {
+        const expense = await expenseService.updateExpense(updatedExpense)
+        setExpenses((prev) => prev.map((e) => (e.id === expense.id ? expense : e)))
+        if (onExpensesUpdated) {
+          onExpensesUpdated((prev) => prev.map((e) => (e.id === expense.id ? expense : e)))
+        }
+        toast({
+          title: "Success",
+          description: "Transaction updated successfully",
+        })
+      } catch (error: any) {
+        console.error("Failed to update transaction:", error)
+        toast({
+          title: "Error",
+          description: error?.message || "Failed to update transaction. Please try again.",
+          variant: "destructive",
+        })
+      }
+    },
+    [onExpensesUpdated, toast],
+  )
+
+  const handleTransactionDeleted = useCallback(
+    async (id: string) => {
+      try {
+        await expenseService.deleteExpense(id)
+        setExpenses((prev) => prev.filter((expense) => expense.id !== id))
+        if (onExpensesUpdated) {
+          onExpensesUpdated((prev) => prev.filter((expense) => expense.id !== id))
+        }
+        toast({
+          title: "Success",
+          description: "Transaction deleted successfully",
+        })
+      } catch (error: any) {
+        console.error("Failed to delete transaction:", error)
+        toast({
+          title: "Error",
+          description: error?.message || "Failed to delete transaction. Please try again.",
+          variant: "destructive",
+        })
+      }
+    },
+    [onExpensesUpdated, toast],
+  )
+
+  const handleViewAll = useCallback(() => {
     router.push("/?tab=transactions")
-  }
+  }, [router])
+
+  // Use useMemo for filtered expenses to prevent recalculation on every render
+  const filteredExpenses = useMemo(() => {
+    if (activeTab === "recent") return expenses
+    return expenses.filter((expense) => expense.type === activeTab)
+  }, [expenses, activeTab])
 
   return (
     <Card className="w-full">

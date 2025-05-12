@@ -30,6 +30,7 @@ interface MinimalTransactionTableProps {
   limit?: number
   showViewAll?: boolean
   onViewAll?: () => void
+  className?: string
 }
 
 export function MinimalTransactionTable({
@@ -40,6 +41,7 @@ export function MinimalTransactionTable({
   limit,
   showViewAll = false,
   onViewAll,
+  className = "",
 }: MinimalTransactionTableProps) {
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -85,11 +87,12 @@ export function MinimalTransactionTable({
     }).format(amount)
   }
 
-  const limitedExpenses = limit ? expenses.slice(0, limit) : expenses
+  // Only limit if the limit prop is provided
+  const displayedExpenses = limit ? expenses.slice(0, limit) : expenses
 
   if (isLoading) {
     return (
-      <div className="w-full space-y-3">
+      <div className={`w-full space-y-3 ${className}`}>
         {[1, 2, 3].map((i) => (
           <div key={i} className="h-12 bg-muted/30 rounded-md animate-pulse w-full"></div>
         ))}
@@ -99,7 +102,7 @@ export function MinimalTransactionTable({
 
   if (expenses.length === 0) {
     return (
-      <div className="text-center py-6 w-full">
+      <div className={`text-center py-6 w-full ${className}`}>
         <p className="text-muted-foreground">No transactions found</p>
       </div>
     )
@@ -119,7 +122,7 @@ export function MinimalTransactionTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {limitedExpenses.map((expense) => (
+          {displayedExpenses.map((expense) => (
             <TableRow key={expense.id}>
               <TableCell className="font-medium">{format(new Date(expense.date), "dd MMM")}</TableCell>
               <TableCell>
@@ -161,7 +164,7 @@ export function MinimalTransactionTable({
   // Mobile view - Cards
   const MobileCards = () => (
     <div className="md:hidden space-y-3">
-      {limitedExpenses.map((expense) => (
+      {displayedExpenses.map((expense) => (
         <Card key={expense.id} className="overflow-hidden">
           <CardContent className="p-3">
             <div className="flex justify-between items-center">
@@ -205,7 +208,7 @@ export function MinimalTransactionTable({
   )
 
   return (
-    <>
+    <div className={className}>
       <DesktopTable />
       <MobileCards />
 
@@ -245,6 +248,6 @@ export function MinimalTransactionTable({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   )
 }
