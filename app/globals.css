@@ -33,6 +33,10 @@
     --ring: 240 10% 3.9%;
 
     --radius: 0.5rem;
+
+    /* Chart colors */
+    --chart-1: 143 85% 40%;
+    --chart-2: 0 84% 60%;
   }
 
   .dark {
@@ -63,6 +67,10 @@
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
     --ring: 240 4.9% 83.9%;
+
+    /* Chart colors */
+    --chart-1: 143 70% 50%;
+    --chart-2: 0 70% 60%;
   }
 }
 
@@ -89,4 +97,18 @@
 html,
 body {
   overflow-y: auto;
+}
+
+/* Chart styles */
+.recharts-wrapper {
+  overflow: visible !important;
+}
+
+.recharts-surface {
+  overflow: visible !important;
+}
+
+.recharts-responsive-container {
+  width: 100% !important;
+  height: 100% !important;
 }

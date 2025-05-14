@@ -6,14 +6,24 @@ import { Area, AreaChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } fro
 import { type ChartConfig, ChartContainer, ChartTooltip } from "@/components/ui/chart"
 import { HiddenValue } from "@/components/hidden-value"
 import type { Expense } from "@/types/expense"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface BalanceTrendChartProps {
   expenses: Expense[]
+  isLoading?: boolean
 }
 
-export function BalanceTrendChart({ expenses }: BalanceTrendChartProps) {
+export function BalanceTrendChart({ expenses, isLoading = false }: BalanceTrendChartProps) {
   // Generate chart data from expenses
   const { chartData, currentBalance, isPositive } = useMemo(() => {
+    if (!expenses.length) {
+      return {
+        chartData: [],
+        currentBalance: 0,
+        isPositive: true,
+      }
+    }
+
     // Sort expenses by date
     const sortedExpenses = [...expenses].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 
@@ -75,7 +85,7 @@ export function BalanceTrendChart({ expenses }: BalanceTrendChartProps) {
   const chartConfig = {
     balance: {
       label: "Balance",
-      color: isPositive ? "hsl(var(--chart-1))" : "hsl(var(--chart-2))",
+      color: isPositive ? "hsl(143, 85%, 40%)" : "hsl(0, 84%, 60%)", // Explicit green or red
     },
   } satisfies ChartConfig
 
@@ -87,6 +97,40 @@ export function BalanceTrendChart({ expenses }: BalanceTrendChartProps) {
     }).format(amount)
   }
 
+  if (isLoading) {
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <Skeleton className="h-6 w-32" />
+          <Skeleton className="h-4 w-48" />
+        </CardHeader>
+        <CardContent>
+          <div className="h-[300px] w-full bg-muted/20 rounded-md flex items-center justify-center">
+            <p className="text-muted-foreground">Loading chart data...</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (chartData.length === 0) {
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>Balance Trend</CardTitle>
+          <CardDescription>
+            Current Balance: <HiddenValue value={formatCurrency(0)} />
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[300px] w-full bg-muted/20 rounded-md flex items-center justify-center">
+            <p className="text-muted-foreground">No transaction data available to display chart.</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
     <Card className="w-full">
       <CardHeader>
@@ -96,7 +140,7 @@ export function BalanceTrendChart({ expenses }: BalanceTrendChartProps) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="h-[300px]">
+        <div className="h-[300px] w-full">
           <ChartContainer config={chartConfig}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart
@@ -108,6 +152,12 @@ export function BalanceTrendChart({ expenses }: BalanceTrendChartProps) {
                   bottom: 0,
                 }}
               >
+                <defs>
+                  <linearGradient id="balanceGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--color-balance)" stopOpacity={0.8} />
+                    <stop offset="95%" stopColor="var(--color-balance)" stopOpacity={0.2} />
+                  </linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} minTickGap={30} />
                 <YAxis
@@ -157,8 +207,9 @@ export function BalanceTrendChart({ expenses }: BalanceTrendChartProps) {
                   type="monotone"
                   dataKey="balance"
                   stroke="var(--color-balance)"
-                  fill="var(--color-balance)"
-                  fillOpacity={0.2}
+                  fill="url(#balanceGradient)"
+                  fillOpacity={1}
+                  strokeWidth={2}
                 />
               </AreaChart>
             </ResponsiveContainer>

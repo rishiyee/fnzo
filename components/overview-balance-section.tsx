@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { BalanceTrendChart } from "@/components/balance-trend-chart"
 import { expenseService } from "@/lib/expense-service"
 import { useToast } from "@/hooks/use-toast"
@@ -11,29 +11,53 @@ export function OverviewBalanceSection() {
   const [isLoading, setIsLoading] = useState(true)
   const { toast } = useToast()
 
+  const loadExpenses = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const data = await expenseService.getExpenses()
+      setExpenses(data)
+    } catch (error) {
+      console.error("Failed to load expenses:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load transactions. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }, [toast])
+
   useEffect(() => {
-    const loadExpenses = async () => {
-      setIsLoading(true)
+    let isMounted = true
+
+    const fetchData = async () => {
       try {
         const data = await expenseService.getExpenses()
-        setExpenses(data)
+        if (isMounted) {
+          setExpenses(data)
+          setIsLoading(false)
+        }
       } catch (error) {
         console.error("Failed to load expenses:", error)
-        toast({
-          title: "Error",
-          description: "Failed to load transactions. Please try again.",
-          variant: "destructive",
-        })
-      } finally {
-        setIsLoading(false)
+        if (isMounted) {
+          toast({
+            title: "Error",
+            description: "Failed to load transactions. Please try again.",
+            variant: "destructive",
+          })
+          setIsLoading(false)
+        }
       }
     }
 
-    loadExpenses()
+    fetchData()
 
     // Set up event listener for expense updates
     const handleExpenseUpdated = () => {
-      loadExpenses()
+      if (isMounted) {
+        loadExpenses()
+      }
     }
 
     window.addEventListener("expense-updated", handleExpenseUpdated)
@@ -41,15 +65,17 @@ export function OverviewBalanceSection() {
     window.addEventListener("expense-deleted", handleExpenseUpdated)
 
     return () => {
+      isMounted = false
       window.removeEventListener("expense-updated", handleExpenseUpdated)
       window.removeEventListener("expense-added", handleExpenseUpdated)
       window.removeEventListener("expense-deleted", handleExpenseUpdated)
     }
-  }, [toast])
+  }, [toast, loadExpenses])
 
-  if (isLoading) {
-    return <div className="w-full h-[400px] rounded-lg border bg-card animate-pulse"></div>
-  }
+  // Debug output to console
+  useEffect(() => {
+    console.log("OverviewBalanceSection - Expenses loaded:", expenses.length)
+  }, [expenses])
 
-  return <BalanceTrendChart expenses={expenses} />
+  return <BalanceTrendChart expenses={expenses} isLoading={isLoading} />
 }

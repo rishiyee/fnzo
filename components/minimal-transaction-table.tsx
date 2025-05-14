@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { format } from "date-fns"
-import { Edit, Trash2, ChevronRight } from "lucide-react"
+import { Edit, Trash2, ChevronRight, ChevronLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { HiddenValue } from "@/components/hidden-value"
 import { Card, CardContent } from "@/components/ui/card"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { Expense } from "@/types/expense"
 
 interface MinimalTransactionTableProps {
@@ -31,6 +32,12 @@ interface MinimalTransactionTableProps {
   showViewAll?: boolean
   onViewAll?: () => void
   className?: string
+  currentPage?: number
+  totalPages?: number
+  onPageChange?: (page: number) => void
+  itemsPerPage?: number
+  onItemsPerPageChange?: (itemsPerPage: number) => void
+  showPagination?: boolean
 }
 
 export function MinimalTransactionTable({
@@ -42,6 +49,12 @@ export function MinimalTransactionTable({
   showViewAll = false,
   onViewAll,
   className = "",
+  currentPage = 1,
+  totalPages = 1,
+  onPageChange,
+  itemsPerPage = 10,
+  onItemsPerPageChange,
+  showPagination = false,
 }: MinimalTransactionTableProps) {
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -87,8 +100,8 @@ export function MinimalTransactionTable({
     }).format(amount)
   }
 
-  // Only limit if the limit prop is provided
-  const displayedExpenses = limit ? expenses.slice(0, limit) : expenses
+  // Only limit if the limit prop is provided and pagination is not enabled
+  const displayedExpenses = limit && !showPagination ? expenses.slice(0, limit) : expenses
 
   if (isLoading) {
     return (
@@ -104,6 +117,55 @@ export function MinimalTransactionTable({
     return (
       <div className={`text-center py-6 w-full ${className}`}>
         <p className="text-muted-foreground">No transactions found</p>
+      </div>
+    )
+  }
+
+  // Pagination controls
+  const PaginationControls = () => {
+    if (!showPagination) return null
+
+    return (
+      <div className="flex items-center justify-between mt-4">
+        <div className="flex items-center space-x-2">
+          <span className="text-sm text-muted-foreground">Items per page</span>
+          <Select
+            value={itemsPerPage.toString()}
+            onValueChange={(value) => onItemsPerPageChange && onItemsPerPageChange(Number.parseInt(value))}
+          >
+            <SelectTrigger className="h-8 w-[70px]">
+              <SelectValue placeholder={itemsPerPage.toString()} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="5">5</SelectItem>
+              <SelectItem value="10">10</SelectItem>
+              <SelectItem value="20">20</SelectItem>
+              <SelectItem value="50">50</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange && onPageChange(currentPage - 1)}
+            disabled={currentPage <= 1}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="text-sm">
+            Page {currentPage} of {totalPages || 1}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange && onPageChange(currentPage + 1)}
+            disabled={currentPage >= (totalPages || 1)}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
     )
   }
@@ -150,7 +212,7 @@ export function MinimalTransactionTable({
           ))}
         </TableBody>
       </Table>
-      {showViewAll && onViewAll && (
+      {showViewAll && onViewAll && !showPagination && (
         <div className="flex justify-center mt-4">
           <Button variant="outline" size="sm" onClick={onViewAll} className="w-full max-w-xs">
             View All Transactions
@@ -158,6 +220,7 @@ export function MinimalTransactionTable({
           </Button>
         </div>
       )}
+      {showPagination && <PaginationControls />}
     </div>
   )
 
@@ -198,11 +261,16 @@ export function MinimalTransactionTable({
           </CardContent>
         </Card>
       ))}
-      {showViewAll && onViewAll && (
+      {showViewAll && onViewAll && !showPagination && (
         <Button variant="outline" size="sm" onClick={onViewAll} className="w-full mt-2">
           View All Transactions
           <ChevronRight className="ml-2 h-4 w-4" />
         </Button>
+      )}
+      {showPagination && (
+        <div className="mt-4">
+          <PaginationControls />
+        </div>
       )}
     </div>
   )

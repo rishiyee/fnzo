@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { OverviewStats } from "@/components/overview-stats"
 import { OverviewBalanceSection } from "@/components/overview-balance-section"
+import { ChartDebug } from "@/components/chart-debug"
 import { expenseService } from "@/lib/expense-service"
 import { useToast } from "@/hooks/use-toast"
 import type { Expense } from "@/types/expense"
@@ -145,11 +146,11 @@ export default function Home() {
             Transactions
           </LimitedWidthTabsTrigger>
         </LimitedWidthTabsList>
-        <LimitedWidthTabsContent value="overview">
-          <div className="space-y-6">
-            <OverviewStats />
-            <OverviewBalanceSection />
-          </div>
+        <LimitedWidthTabsContent value="overview" className="space-y-6">
+          <OverviewStats />
+          <OverviewBalanceSection />
+          {/* Temporary debug component */}
+          {process.env.NODE_ENV !== "production" && <ChartDebug />}
         </LimitedWidthTabsContent>
         <LimitedWidthTabsContent value="transactions">
           <div className="space-y-4">

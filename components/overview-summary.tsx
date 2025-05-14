@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo } from "react"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
@@ -9,7 +8,8 @@ import { MinimalTransactionTable } from "@/components/minimal-transaction-table"
 import { TransactionModal } from "@/components/transaction-modal"
 import { expenseService } from "@/lib/expense-service"
 import { useToast } from "@/hooks/use-toast"
-import { useRouter } from "next/navigation"
+import { UnifiedFilter } from "@/components/unified-filter"
+import { FilterProvider, useFilter } from "@/contexts/filter-context"
 import type { Expense } from "@/types/expense"
 
 interface OverviewSummaryProps {
@@ -17,34 +17,14 @@ interface OverviewSummaryProps {
   onAddTransaction?: (callback: (expense: Expense) => void) => void
 }
 
-export default function OverviewSummary({ onExpensesUpdated, onAddTransaction }: OverviewSummaryProps) {
-  const [activeTab, setActiveTab] = useState("recent")
-  const [isModalOpen, setIsModalOpen] = useState(false)
+function TransactionContent({ onExpensesUpdated }: { onExpensesUpdated?: (expenses: Expense[]) => void }) {
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(10)
   const { toast } = useToast()
-  const router = useRouter()
-
-  // Use useCallback to prevent this function from being recreated on every render
-  const loadExpenses = useCallback(async () => {
-    try {
-      setIsLoading(true)
-      const data = await expenseService.getExpenses()
-      setExpenses(data)
-      if (onExpensesUpdated) {
-        onExpensesUpdated(data)
-      }
-    } catch (error) {
-      console.error("Failed to load expenses:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load transactions. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }, [onExpensesUpdated, toast])
+  const { applyFilters } = useFilter()
 
   // Load expenses only once when the component mounts
   useEffect(() => {
@@ -139,83 +119,62 @@ export default function OverviewSummary({ onExpensesUpdated, onAddTransaction }:
     [onExpensesUpdated, toast],
   )
 
-  const handleViewAll = useCallback(() => {
-    router.push("/?tab=transactions")
-  }, [router])
-
-  // Use useMemo for filtered expenses to prevent recalculation on every render
+  // Apply filters to expenses
   const filteredExpenses = useMemo(() => {
-    if (activeTab === "recent") return expenses
-    return expenses.filter((expense) => expense.type === activeTab)
-  }, [expenses, activeTab])
+    return applyFilters(expenses)
+  }, [expenses, applyFilters])
+
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredExpenses.length / itemsPerPage)
+  const paginatedExpenses = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage
+    return filteredExpenses.slice(startIndex, startIndex + itemsPerPage)
+  }, [filteredExpenses, currentPage, itemsPerPage])
 
   return (
-    <Card className="w-full">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>Recent Transactions</CardTitle>
-            <CardDescription>Your recent financial activities</CardDescription>
-          </div>
-          <Button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Add Transaction
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent className="p-0">
-        <Tabs defaultValue="recent" value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <div className="px-6">
-            <TabsList className="w-full grid grid-cols-3">
-              <TabsTrigger value="recent">Recent</TabsTrigger>
-              <TabsTrigger value="expense">Expenses</TabsTrigger>
-              <TabsTrigger value="income">Income</TabsTrigger>
-            </TabsList>
-          </div>
+    <>
+      <div className="flex justify-between items-center mb-4">
+        <UnifiedFilter compact />
+        <Button onClick={() => setIsModalOpen(true)} size="sm" className="flex items-center gap-2">
+          <Plus className="h-4 w-4" />
+          Add Transaction
+        </Button>
+      </div>
 
-          <TabsContent value="recent" className="m-0 p-6">
-            <MinimalTransactionTable
-              expenses={expenses}
-              isLoading={isLoading}
-              onUpdate={handleTransactionUpdated}
-              onDelete={handleTransactionDeleted}
-              limit={5}
-              showViewAll={true}
-              onViewAll={handleViewAll}
-            />
-          </TabsContent>
-
-          <TabsContent value="expense" className="m-0 p-6">
-            <MinimalTransactionTable
-              expenses={expenses.filter((expense) => expense.type === "expense")}
-              isLoading={isLoading}
-              onUpdate={handleTransactionUpdated}
-              onDelete={handleTransactionDeleted}
-              limit={5}
-              showViewAll={true}
-              onViewAll={handleViewAll}
-            />
-          </TabsContent>
-
-          <TabsContent value="income" className="m-0 p-6">
-            <MinimalTransactionTable
-              expenses={expenses.filter((expense) => expense.type === "income")}
-              isLoading={isLoading}
-              onUpdate={handleTransactionUpdated}
-              onDelete={handleTransactionDeleted}
-              limit={5}
-              showViewAll={true}
-              onViewAll={handleViewAll}
-            />
-          </TabsContent>
-        </Tabs>
-      </CardContent>
+      <MinimalTransactionTable
+        expenses={paginatedExpenses}
+        isLoading={isLoading}
+        onUpdate={handleTransactionUpdated}
+        onDelete={handleTransactionDeleted}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+        itemsPerPage={itemsPerPage}
+        onItemsPerPageChange={setItemsPerPage}
+        showPagination={true}
+      />
 
       <TransactionModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onTransactionAdded={handleTransactionAdded}
       />
-    </Card>
+    </>
+  )
+}
+
+export default function OverviewSummary({ onExpensesUpdated, onAddTransaction }: OverviewSummaryProps) {
+  return (
+    <FilterProvider>
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>Recent Transactions</CardTitle>
+          <CardDescription>Your financial activities</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <TransactionContent onExpensesUpdated={onExpensesUpdated} />
+        </CardContent>
+      </Card>
+    </FilterProvider>
   )
 }
