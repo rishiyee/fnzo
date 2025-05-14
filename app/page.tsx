@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { OverviewStats } from "@/components/overview-stats"
+import { OverviewBalanceSection } from "@/components/overview-balance-section"
 import { expenseService } from "@/lib/expense-service"
 import { useToast } from "@/hooks/use-toast"
 import type { Expense } from "@/types/expense"
@@ -145,7 +146,10 @@ export default function Home() {
           </LimitedWidthTabsTrigger>
         </LimitedWidthTabsList>
         <LimitedWidthTabsContent value="overview">
-          <OverviewStats />
+          <div className="space-y-6">
+            <OverviewStats />
+            <OverviewBalanceSection />
+          </div>
         </LimitedWidthTabsContent>
         <LimitedWidthTabsContent value="transactions">
           <div className="space-y-4">
