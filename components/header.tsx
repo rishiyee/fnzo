@@ -1,7 +1,7 @@
 "use client"
 
 import { usePathname, useRouter } from "next/navigation"
-import { LayoutDashboard, FileIcon, BarChart3, Settings, Menu, X, ChevronDown, Plus } from "lucide-react"
+import { LayoutDashboard, FileIcon, BarChart3, Settings, Menu, X, ChevronDown, Plus, Eye, EyeOff } from "lucide-react"
 import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -9,7 +9,7 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useAuth } from "@/contexts/auth-context"
 import { TransactionModal } from "@/components/transaction-modal"
-import { BulkTransactionModal } from "@/components/bulk-transaction-modal"
+import { useVisibility } from "@/contexts/visibility-context"
 import type { Expense } from "@/types/expense"
 
 export function Header() {
@@ -18,8 +18,8 @@ export function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false)
-  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false)
   const { user, signOut } = useAuth()
+  const { isVisible, toggleVisibility } = useVisibility()
 
   // Handle scroll effect for header
   useEffect(() => {
@@ -64,12 +64,6 @@ export function Header() {
     // We're not updating any state here, so this shouldn't cause re-renders
   }, [])
 
-  const handleTransactionsAdded = useCallback((expenses: Expense[]) => {
-    // This is just a placeholder. In a real app, you'd want to update your state or refetch data
-    console.log("Transactions added:", expenses)
-    // We're not updating any state here, so this shouldn't cause re-renders
-  }, [])
-
   return (
     <>
       {/* Fixed Header - Now 100% width */}
@@ -107,6 +101,14 @@ export function Header() {
                 <span className="hidden sm:inline">New Transaction</span>
               </Button>
             )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={toggleVisibility}
+              title={isVisible ? "Hide Values" : "Show Values"}
+            >
+              {isVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </Button>
             <ThemeToggle />
 
             {user ? (
@@ -147,6 +149,15 @@ export function Header() {
                 <Plus className="h-5 w-5" />
               </Button>
             )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleVisibility}
+              title={isVisible ? "Hide Values" : "Show Values"}
+              className="mr-1"
+            >
+              {isVisible ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+            </Button>
             <ThemeToggle />
             <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(true)}>
               <Menu className="h-5 w-5" />
@@ -238,19 +249,11 @@ export function Header() {
 
       {/* Transaction Modal */}
       {user && (
-        <>
-          <TransactionModal
-            isOpen={isTransactionModalOpen}
-            onClose={() => setIsTransactionModalOpen(false)}
-            onTransactionAdded={handleTransactionAdded}
-          />
-
-          <BulkTransactionModal
-            isOpen={isBulkModalOpen}
-            onClose={() => setIsBulkModalOpen(false)}
-            onTransactionsAdded={handleTransactionsAdded}
-          />
-        </>
+        <TransactionModal
+          isOpen={isTransactionModalOpen}
+          onClose={() => setIsTransactionModalOpen(false)}
+          onTransactionAdded={handleTransactionAdded}
+        />
       )}
     </>
   )

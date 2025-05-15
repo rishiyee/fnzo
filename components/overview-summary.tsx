@@ -1,9 +1,11 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Plus } from "lucide-react"
+import { CardDescription } from "@/components/ui/card"
+
+import { useMemo } from "react"
+
+import { useState, useEffect, useCallback } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { MinimalTransactionTable } from "@/components/minimal-transaction-table"
 import { TransactionModal } from "@/components/transaction-modal"
 import { expenseService } from "@/lib/expense-service"
@@ -22,7 +24,7 @@ function TransactionContent({ onExpensesUpdated }: { onExpensesUpdated?: (expens
   const [isLoading, setIsLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage, setItemsPerPage] = useState(10)
+  const [itemsPerPage, setItemsPerPage] = useState(500) // Default to 500
   const { toast } = useToast()
   const { applyFilters } = useFilter()
 
@@ -133,12 +135,8 @@ function TransactionContent({ onExpensesUpdated }: { onExpensesUpdated?: (expens
 
   return (
     <>
-      <div className="flex justify-between items-center mb-4">
+      <div className="mb-4">
         <UnifiedFilter compact />
-        <Button onClick={() => setIsModalOpen(true)} size="sm" className="flex items-center gap-2">
-          <Plus className="h-4 w-4" />
-          Add Transaction
-        </Button>
       </div>
 
       <MinimalTransactionTable

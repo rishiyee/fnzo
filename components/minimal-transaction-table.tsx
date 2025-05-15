@@ -19,7 +19,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { HiddenValue } from "@/components/hidden-value"
-import { Card, CardContent } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { Expense } from "@/types/expense"
 
@@ -126,7 +125,7 @@ export function MinimalTransactionTable({
     if (!showPagination) return null
 
     return (
-      <div className="flex items-center justify-between mt-4">
+      <div className="flex flex-col sm:flex-row items-center justify-between mt-4 gap-2">
         <div className="flex items-center space-x-2">
           <span className="text-sm text-muted-foreground">Items per page</span>
           <Select
@@ -137,10 +136,11 @@ export function MinimalTransactionTable({
               <SelectValue placeholder={itemsPerPage.toString()} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="5">5</SelectItem>
               <SelectItem value="10">10</SelectItem>
               <SelectItem value="20">20</SelectItem>
               <SelectItem value="50">50</SelectItem>
+              <SelectItem value="100">100</SelectItem>
+              <SelectItem value="500">500</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -170,48 +170,50 @@ export function MinimalTransactionTable({
     )
   }
 
-  // Desktop view - Table
-  const DesktopTable = () => (
-    <div className="hidden md:block w-full">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[100px]">Date</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>Category</TableHead>
-            <TableHead className="text-right">Amount</TableHead>
-            <TableHead className="w-[100px] text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {displayedExpenses.map((expense) => (
-            <TableRow key={expense.id}>
-              <TableCell className="font-medium">{format(new Date(expense.date), "dd MMM")}</TableCell>
-              <TableCell>
-                <Badge variant={getTypeColor(expense.type)} className="capitalize">
-                  {expense.type}
-                </Badge>
-              </TableCell>
-              <TableCell>{expense.category}</TableCell>
-              <TableCell className="text-right font-medium">
-                <HiddenValue value={formatCurrency(expense.amount)} />
-              </TableCell>
-              <TableCell className="text-right">
-                <div className="flex justify-end space-x-1">
-                  <Button variant="ghost" size="icon" onClick={() => handleEditClick(expense)}>
-                    <Edit className="h-4 w-4" />
-                    <span className="sr-only">Edit</span>
-                  </Button>
-                  <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(expense.id)}>
-                    <Trash2 className="h-4 w-4" />
-                    <span className="sr-only">Delete</span>
-                  </Button>
-                </div>
-              </TableCell>
+  return (
+    <div className={className}>
+      <div className="w-full overflow-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[100px]">Date</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Category</TableHead>
+              <TableHead className="text-right">Amount</TableHead>
+              <TableHead className="w-[100px] text-right">Actions</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {displayedExpenses.map((expense) => (
+              <TableRow key={expense.id}>
+                <TableCell className="font-medium">{format(new Date(expense.date), "dd MMM")}</TableCell>
+                <TableCell>
+                  <Badge variant={getTypeColor(expense.type)} className="capitalize">
+                    {expense.type}
+                  </Badge>
+                </TableCell>
+                <TableCell>{expense.category}</TableCell>
+                <TableCell className="text-right font-medium">
+                  <HiddenValue value={formatCurrency(expense.amount)} />
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex justify-end space-x-1">
+                    <Button variant="ghost" size="icon" onClick={() => handleEditClick(expense)}>
+                      <Edit className="h-4 w-4" />
+                      <span className="sr-only">Edit</span>
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(expense.id)}>
+                      <Trash2 className="h-4 w-4" />
+                      <span className="sr-only">Delete</span>
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
       {showViewAll && onViewAll && !showPagination && (
         <div className="flex justify-center mt-4">
           <Button variant="outline" size="sm" onClick={onViewAll} className="w-full max-w-xs">
@@ -220,65 +222,8 @@ export function MinimalTransactionTable({
           </Button>
         </div>
       )}
+
       {showPagination && <PaginationControls />}
-    </div>
-  )
-
-  // Mobile view - Cards
-  const MobileCards = () => (
-    <div className="md:hidden space-y-3">
-      {displayedExpenses.map((expense) => (
-        <Card key={expense.id} className="overflow-hidden">
-          <CardContent className="p-3">
-            <div className="flex justify-between items-center">
-              <div className="flex flex-col">
-                <div className="flex items-center gap-2">
-                  <Badge variant={getTypeColor(expense.type)} className="capitalize">
-                    {expense.type}
-                  </Badge>
-                  <span className="text-sm font-medium">{expense.category}</span>
-                </div>
-                <span className="text-xs text-muted-foreground mt-1">
-                  {format(new Date(expense.date), "dd MMM yyyy")}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="font-medium">
-                  <HiddenValue value={formatCurrency(expense.amount)} />
-                </span>
-                <div className="flex">
-                  <Button variant="ghost" size="icon" onClick={() => handleEditClick(expense)}>
-                    <Edit className="h-4 w-4" />
-                    <span className="sr-only">Edit</span>
-                  </Button>
-                  <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(expense.id)}>
-                    <Trash2 className="h-4 w-4" />
-                    <span className="sr-only">Delete</span>
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
-      {showViewAll && onViewAll && !showPagination && (
-        <Button variant="outline" size="sm" onClick={onViewAll} className="w-full mt-2">
-          View All Transactions
-          <ChevronRight className="ml-2 h-4 w-4" />
-        </Button>
-      )}
-      {showPagination && (
-        <div className="mt-4">
-          <PaginationControls />
-        </div>
-      )}
-    </div>
-  )
-
-  return (
-    <div className={className}>
-      <DesktopTable />
-      <MobileCards />
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
