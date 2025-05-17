@@ -5,7 +5,7 @@ import { CardDescription } from "@/components/ui/card"
 import { useMemo } from "react"
 
 import { useState, useEffect, useCallback } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { CardHeader, CardTitle } from "@/components/ui/card"
 import { MinimalTransactionTable } from "@/components/minimal-transaction-table"
 import { TransactionModal } from "@/components/transaction-modal"
 import { expenseService } from "@/lib/expense-service"
@@ -164,15 +164,8 @@ function TransactionContent({ onExpensesUpdated }: { onExpensesUpdated?: (expens
 export default function OverviewSummary({ onExpensesUpdated, onAddTransaction }: OverviewSummaryProps) {
   return (
     <FilterProvider>
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle>Recent Transactions</CardTitle>
-          <CardDescription>Your financial activities</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <TransactionContent onExpensesUpdated={onExpensesUpdated} />
-        </CardContent>
-      </Card>
+      
+      <TransactionContent onExpensesUpdated={onExpensesUpdated} />
     </FilterProvider>
   )
 }

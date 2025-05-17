@@ -10,6 +10,7 @@ import { templateService } from "@/lib/template-service"
 import type { TransactionTemplate } from "@/types/template"
 import type { ExpenseType } from "@/types/expense"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface TemplateSelectorProps {
   onSelectTemplate: (template: TransactionTemplate) => void
@@ -21,6 +22,7 @@ export function TemplateSelector({ onSelectTemplate, type }: TemplateSelectorPro
   const [templates, setTemplates] = useState<TransactionTemplate[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
 
   // Load templates
   useEffect(() => {
@@ -64,8 +66,25 @@ export function TemplateSelector({ onSelectTemplate, type }: TemplateSelectorPro
     }
   }, [])
 
-  // Filter templates based on type
-  const filteredTemplates = type ? templates.filter((template) => template.type === type) : templates
+  // Filter templates based on type and search query
+  const filteredTemplates = templates.filter((template) => {
+    // Filter by type if specified
+    if (type && template.type !== type) {
+      return false
+    }
+
+    // Filter by search query if present
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      return (
+        template.name.toLowerCase().includes(query) ||
+        template.category.toLowerCase().includes(query) ||
+        template.notes.toLowerCase().includes(query)
+      )
+    }
+
+    return true
+  })
 
   // Format currency
   const formatCurrency = (amount: number) => {
@@ -82,6 +101,7 @@ export function TemplateSelector({ onSelectTemplate, type }: TemplateSelectorPro
     if (template) {
       onSelectTemplate(template)
       setOpen(false)
+      setSearchQuery("")
     }
   }
 
@@ -97,6 +117,20 @@ export function TemplateSelector({ onSelectTemplate, type }: TemplateSelectorPro
       setError("Failed to load templates. Please try again later.")
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  // Get type badge color
+  const getTypeBadgeColor = (type: ExpenseType) => {
+    switch (type) {
+      case "expense":
+        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300"
+      case "income":
+        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
+      case "savings":
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
+      default:
+        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"
     }
   }
 
@@ -123,15 +157,22 @@ export function TemplateSelector({ onSelectTemplate, type }: TemplateSelectorPro
             className="w-full justify-between"
             disabled={isLoading}
           >
-            {isLoading ? "Loading templates..." : "Select a template"}
+            {isLoading ? (
+              <div className="flex items-center">
+                <Skeleton className="h-4 w-4 rounded-full mr-2" />
+                <Skeleton className="h-4 w-32" />
+              </div>
+            ) : (
+              "Select a template"
+            )}
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-[300px] p-0">
+        <PopoverContent className="w-[350px] p-0">
           <Command>
-            <CommandInput placeholder="Search templates..." />
+            <CommandInput placeholder="Search templates..." value={searchQuery} onValueChange={setSearchQuery} />
             <CommandList>
-              <CommandEmpty>No templates found.</CommandEmpty>
+              <CommandEmpty>{searchQuery ? "No templates match your search." : "No templates available."}</CommandEmpty>
               <CommandGroup>
                 {filteredTemplates.map((template) => (
                   <CommandItem
@@ -141,6 +182,9 @@ export function TemplateSelector({ onSelectTemplate, type }: TemplateSelectorPro
                     className="flex items-center justify-between"
                   >
                     <div className="flex items-center">
+                      <Badge variant="outline" className={`mr-2 ${getTypeBadgeColor(template.type)}`}>
+                        {template.type.charAt(0).toUpperCase()}
+                      </Badge>
                       <span>{template.name}</span>
                       {template.isDefault && <Star className="ml-2 h-3 w-3 text-yellow-500" />}
                     </div>

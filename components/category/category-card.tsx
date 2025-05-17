@@ -1,168 +1,184 @@
 "use client"
 
 import { useState } from "react"
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
+import type { Category } from "@/types/expense"
+import { Pencil, Trash2, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
-import { Edit, Trash2, AlertCircle } from "lucide-react"
+import { Progress } from "@/components/ui/progress"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import type { Category } from "@/lib/category-service"
+import { DeleteCategoryDialog } from "./delete-category-dialog"
+import { CategoryForm } from "./category-form"
+import { CategoryLimitForm } from "./category-limit-form"
+import {
+  EnhancedCard,
+  EnhancedCardHeader,
+  EnhancedCardTitle,
+  EnhancedCardDescription,
+  EnhancedCardContent,
+  EnhancedCardFooter,
+} from "@/components/ui/card-system"
 
 interface CategoryCardProps {
-  category: Category & { spending: number }
-  onEdit: (category: Category) => void
-  onDelete: (category: Category) => void
+  category: Category
+  spent?: number
+  onUpdate: (category: Category) => void
+  onDelete: (id: string) => void
 }
 
-export function CategoryCard({ category, onEdit, onDelete }: CategoryCardProps) {
-  const [isHovered, setIsHovered] = useState(false)
+export function CategoryCard({ category, spent = 0, onUpdate, onDelete }: CategoryCardProps) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [isEditingLimit, setIsEditingLimit] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
-  // Format currency for display
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      maximumFractionDigits: 0,
-    }).format(amount)
+  const handleUpdate = (updatedCategory: Category) => {
+    onUpdate(updatedCategory)
+    setIsEditing(false)
+    setIsEditingLimit(false)
   }
 
-  // Calculate progress percentage
-  const calculateProgress = () => {
-    if (!category.budget || category.budget <= 0) return 0
-    const percentage = (category.spending / category.budget) * 100
-    return Math.min(percentage, 100) // Cap at 100%
+  const handleDelete = () => {
+    onDelete(category.id)
+    setIsDeleting(false)
   }
 
-  // Determine if over budget
-  const isOverBudget = category.budget && category.spending > category.budget
-
-  // Get type badge variant
-  const getTypeVariant = () => {
-    switch (category.type) {
-      case "expense":
-        return "destructive"
-      case "income":
-        return "success"
-      case "savings":
-        return "blue"
-      default:
-        return "secondary"
-    }
-  }
-
-  // Get progress color based on percentage
   const getProgressColor = () => {
-    const progress = calculateProgress()
-    if (progress >= 90) return "bg-red-500"
-    if (progress >= 75) return "bg-amber-500"
-    return "bg-primary"
+    if (!category.limit) return "bg-primary"
+    const percentage = (spent / category.limit) * 100
+    if (percentage >= 90) return "bg-red-500"
+    if (percentage >= 75) return "bg-amber-500"
+    return "bg-emerald-500"
   }
+
+  const getSpentPercentage = () => {
+    if (!category.limit || category.limit === 0) return 0
+    const percentage = (spent / category.limit) * 100
+    return Math.min(percentage, 100)
+  }
+
+  if (isEditing) {
+    return (
+      <EnhancedCard variant="bordered">
+        <EnhancedCardHeader>
+          <EnhancedCardTitle>Edit Category</EnhancedCardTitle>
+        </EnhancedCardHeader>
+        <EnhancedCardContent>
+          <CategoryForm category={category} onSubmit={handleUpdate} onCancel={() => setIsEditing(false)} />
+        </EnhancedCardContent>
+      </EnhancedCard>
+    )
+  }
+
+  if (isEditingLimit) {
+    return (
+      <EnhancedCard variant="bordered">
+        <EnhancedCardHeader>
+          <EnhancedCardTitle>Edit Spending Limit</EnhancedCardTitle>
+        </EnhancedCardHeader>
+        <EnhancedCardContent>
+          <CategoryLimitForm category={category} onSubmit={handleUpdate} onCancel={() => setIsEditingLimit(false)} />
+        </EnhancedCardContent>
+      </EnhancedCard>
+    )
+  }
+
+  const isOverBudget = category.limit && spent > category.limit
+  const spentPercentage = getSpentPercentage()
 
   return (
-    <Card
-      className="h-full transition-all duration-200 hover:shadow-md"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      style={{ borderLeft: `4px solid ${category.color || "#ccc"}` }}
+    <EnhancedCard
+      variant="interactive"
+      isHighlighted={isOverBudget}
+      className={isOverBudget ? "border-red-200 dark:border-red-900" : ""}
     >
-      <CardHeader className="pb-2">
+      <EnhancedCardHeader className="pb-2">
         <div className="flex justify-between items-start">
-          <div>
-            <h3 className="text-lg font-semibold">{category.name}</h3>
-            <Badge variant={getTypeVariant()} className="mt-1">
-              {category.type.charAt(0).toUpperCase() + category.type.slice(1)}
-            </Badge>
+          <div className="flex flex-col">
+            <EnhancedCardTitle className="flex items-center gap-2">
+              <span
+                className="inline-block w-3 h-3 rounded-full mr-1"
+                style={{ backgroundColor: category.color || "#888888" }}
+              />
+              {category.name}
+              {category.isSystem && (
+                <Badge variant="outline" className="ml-2 text-xs">
+                  System
+                </Badge>
+              )}
+            </EnhancedCardTitle>
+            {category.description && <EnhancedCardDescription truncate>{category.description}</EnhancedCardDescription>}
           </div>
-          {category.isDefault && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Badge variant="outline" className="text-xs">
-                    Default
-                  </Badge>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>This is a default system category</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
+          <div className="flex space-x-1">
+            <Button variant="ghost" size="icon" onClick={() => setIsEditing(true)}>
+              <Pencil className="h-4 w-4" />
+              <span className="sr-only">Edit</span>
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => setIsDeleting(true)} disabled={category.isSystem}>
+              <Trash2 className="h-4 w-4" />
+              <span className="sr-only">Delete</span>
+            </Button>
+          </div>
         </div>
-        {category.description && <p className="text-sm text-muted-foreground mt-1">{category.description}</p>}
-      </CardHeader>
-      <CardContent className="pb-2">
+      </EnhancedCardHeader>
+
+      <EnhancedCardContent>
         <div className="space-y-4">
-          <div>
-            <div className="flex justify-between items-center mb-1">
-              <span className="text-sm font-medium">Spending</span>
-              {category.budget ? (
-                <span className="text-sm font-medium">Budget</span>
-              ) : (
-                <span className="text-xs text-muted-foreground">No budget set</span>
-              )}
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-lg font-bold">{formatCurrency(category.spending)}</span>
-              {category.budget ? (
-                <span className={`text-sm ${isOverBudget ? "text-red-500 font-medium" : "text-muted-foreground"}`}>
-                  {formatCurrency(category.budget)}
-                </span>
-              ) : (
-                <span>—</span>
-              )}
-            </div>
+          <div className="flex justify-between items-baseline">
+            <div className="text-2xl font-bold">${spent.toFixed(2)}</div>
+            {category.limit ? (
+              <div className="text-sm text-muted-foreground">of ${category.limit.toFixed(2)}</div>
+            ) : (
+              <Button variant="outline" size="sm" onClick={() => setIsEditingLimit(true)} className="text-xs h-7">
+                Set Limit
+              </Button>
+            )}
           </div>
 
-          {category.budget ? (
-            <div className="space-y-1">
-              <Progress value={calculateProgress()} className={getProgressColor()} />
-              <div className="flex justify-between items-center text-xs">
-                <span
-                  className={`${isOverBudget ? "text-red-500 font-medium flex items-center gap-1" : "text-muted-foreground"}`}
-                >
-                  {isOverBudget && <AlertCircle className="h-3 w-3" />}
-                  {isOverBudget ? "Over budget" : `${calculateProgress().toFixed(0)}% used`}
-                </span>
+          {category.limit > 0 && (
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-xs">
+                <span>Budget Usage</span>
+                <span className={isOverBudget ? "text-red-500 font-medium" : ""}>{spentPercentage.toFixed(0)}%</span>
+              </div>
+              <div className="relative">
+                <Progress value={spentPercentage} max={100} className="h-2" indicatorClassName={getProgressColor()} />
                 {isOverBudget && (
-                  <span className="text-red-500 font-medium">
-                    +{formatCurrency(category.spending - category.budget)}
-                  </span>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="absolute -right-1 -top-1">
+                          <AlertCircle className="h-4 w-4 text-red-500" />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Over budget by ${(spent - category.limit).toFixed(2)}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 )}
               </div>
             </div>
-          ) : null}
+          )}
         </div>
-      </CardContent>
-      <CardFooter className="pt-2">
-        <div className={`flex gap-2 w-full transition-opacity duration-200 ${isHovered ? "opacity-100" : "opacity-0"}`}>
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex-1"
-            onClick={(e) => {
-              e.stopPropagation() // Prevent triggering parent click in merge mode
-              onEdit(category)
-            }}
-          >
-            <Edit className="h-4 w-4 mr-2" />
-            Edit
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex-1 text-destructive hover:text-destructive"
-            onClick={(e) => {
-              e.stopPropagation() // Prevent triggering parent click in merge mode
-              onDelete(category)
-            }}
-            disabled={category.isDefault}
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Delete
-          </Button>
+      </EnhancedCardContent>
+
+      <EnhancedCardFooter withBorder className="flex justify-between pt-4">
+        <div className="text-xs text-muted-foreground">
+          {category.type === "expense" ? "Expense" : "Income"} Category
         </div>
-      </CardFooter>
-    </Card>
+        {category.limit > 0 && (
+          <Button variant="ghost" size="sm" onClick={() => setIsEditingLimit(true)} className="h-7 text-xs">
+            Edit Limit
+          </Button>
+        )}
+      </EnhancedCardFooter>
+
+      <DeleteCategoryDialog
+        open={isDeleting}
+        onOpenChange={setIsDeleting}
+        onConfirm={handleDelete}
+        category={category}
+      />
+    </EnhancedCard>
   )
 }

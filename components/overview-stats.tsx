@@ -6,7 +6,6 @@ import OverviewSummary from "@/components/overview-summary"
 import { expenseService } from "@/lib/expense-service"
 import { useToast } from "@/hooks/use-toast"
 import type { Expense } from "@/types/expense"
-import { BalanceVisualization } from "@/components/balance-visualization"
 
 export function OverviewStats() {
   const [expenses, setExpenses] = useState<Expense[]>([])
@@ -67,10 +66,6 @@ export function OverviewStats() {
   return (
     <div className="space-y-6">
       <ExpenseSummary expenses={expenses} />
-
-      {/* Add the new Balance Visualization component */}
-      <BalanceVisualization expenses={expenses} />
-
       <OverviewSummary onExpensesUpdated={handleExpensesUpdated} />
     </div>
   )

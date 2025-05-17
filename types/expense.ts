@@ -11,3 +11,17 @@ export interface Expense {
   amount: number
   notes: string
 }
+
+export interface Category {
+  id: string
+  name: string
+  description?: string
+  type: ExpenseType
+  budget?: number
+  color?: string
+  icon?: string
+  isDefault?: boolean
+  spending?: number
+  usageCount?: number
+  lastUsed?: string
+}

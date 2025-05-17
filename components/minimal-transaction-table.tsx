@@ -1,8 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import type React from "react"
+
+import { useState, useMemo } from "react"
 import { format } from "date-fns"
-import { Edit, Trash2, ChevronRight, ChevronLeft } from "lucide-react"
+import { Edit, Trash2, ChevronRight, ChevronLeft, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -21,6 +23,10 @@ import {
 import { HiddenValue } from "@/components/hidden-value"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { Expense } from "@/types/expense"
+
+// Define sort types
+type SortColumn = "date" | "type" | "category" | "notes" | "amount"
+type SortDirection = "asc" | "desc"
 
 interface MinimalTransactionTableProps {
   expenses: Expense[]
@@ -60,6 +66,10 @@ export function MinimalTransactionTable({
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null)
 
+  // Sorting state
+  const [sortColumn, setSortColumn] = useState<SortColumn>("date")
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc")
+
   const handleEditClick = (expense: Expense) => {
     setEditingExpense(expense)
     setIsEditDialogOpen(true)
@@ -77,6 +87,58 @@ export function MinimalTransactionTable({
       setExpenseToDelete(null)
     }
   }
+
+  // Handle column header click for sorting
+  const handleSortClick = (column: SortColumn) => {
+    if (sortColumn === column) {
+      // Toggle direction if same column
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc")
+    } else {
+      // Set new column and default direction
+      setSortColumn(column)
+      setSortDirection("asc")
+    }
+  }
+
+  // Get sort icon based on current sort state
+  const getSortIcon = (column: SortColumn) => {
+    if (sortColumn !== column) {
+      return <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground/70" />
+    }
+
+    return sortDirection === "asc" ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />
+  }
+
+  // Sort the expenses
+  const sortedExpenses = useMemo(() => {
+    const sorted = [...expenses]
+
+    sorted.sort((a, b) => {
+      let comparison = 0
+
+      switch (sortColumn) {
+        case "date":
+          comparison = new Date(a.date).getTime() - new Date(b.date).getTime()
+          break
+        case "type":
+          comparison = a.type.localeCompare(b.type)
+          break
+        case "category":
+          comparison = a.category.localeCompare(b.category)
+          break
+        case "notes":
+          comparison = (a.notes || "").localeCompare(b.notes || "")
+          break
+        case "amount":
+          comparison = a.amount - b.amount
+          break
+      }
+
+      return sortDirection === "asc" ? comparison : -comparison
+    })
+
+    return sorted
+  }, [expenses, sortColumn, sortDirection])
 
   const getTypeColor = (type: string) => {
     switch (type) {
@@ -100,7 +162,7 @@ export function MinimalTransactionTable({
   }
 
   // Only limit if the limit prop is provided and pagination is not enabled
-  const displayedExpenses = limit && !showPagination ? expenses.slice(0, limit) : expenses
+  const displayedExpenses = limit && !showPagination ? sortedExpenses.slice(0, limit) : sortedExpenses
 
   if (isLoading) {
     return (
@@ -170,16 +232,30 @@ export function MinimalTransactionTable({
     )
   }
 
+  // Create sortable header
+  const SortableHeader = ({ column, children }: { column: SortColumn; children: React.ReactNode }) => (
+    <TableHead
+      className={`cursor-pointer hover:bg-muted/50 ${column === "amount" ? "text-right" : ""}`}
+      onClick={() => handleSortClick(column)}
+    >
+      <div className="flex items-center">
+        <span>{children}</span>
+        {getSortIcon(column)}
+      </div>
+    </TableHead>
+  )
+
   return (
     <div className={className}>
       <div className="w-full overflow-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[100px]">Date</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead className="text-right">Amount</TableHead>
+              <SortableHeader column="date">Date</SortableHeader>
+              <SortableHeader column="type">Type</SortableHeader>
+              <SortableHeader column="category">Category</SortableHeader>
+              <SortableHeader column="notes">Notes</SortableHeader>
+              <SortableHeader column="amount">Amount</SortableHeader>
               <TableHead className="w-[100px] text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -193,6 +269,9 @@ export function MinimalTransactionTable({
                   </Badge>
                 </TableCell>
                 <TableCell>{expense.category}</TableCell>
+                <TableCell className="max-w-[200px] truncate">
+                  {expense.notes || <span className="text-muted-foreground text-xs italic">No notes</span>}
+                </TableCell>
                 <TableCell className="text-right font-medium">
                   <HiddenValue value={formatCurrency(expense.amount)} />
                 </TableCell>

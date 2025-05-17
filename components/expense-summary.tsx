@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import { ArrowDownIcon, ArrowUpIcon, PiggyBankIcon, CheckCircle, AlertCircle } from "lucide-react"
+import { ArrowDownIcon, ArrowUpIcon, PiggyBankIcon, CheckCircle, AlertCircle, WalletIcon } from "lucide-react"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -76,7 +76,7 @@ export function ExpenseSummary({ expenses }: ExpenseSummaryProps) {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-      <Card>
+      <Card className="overflow-hidden hover:shadow-md transition-shadow border-t-4 border-t-green-500">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Income</CardTitle>
           <ArrowUpIcon className="h-4 w-4 text-green-500" />
@@ -98,7 +98,7 @@ export function ExpenseSummary({ expenses }: ExpenseSummaryProps) {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="overflow-hidden hover:shadow-md transition-shadow border-t-4 border-t-red-500">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Expenses</CardTitle>
           <ArrowDownIcon className="h-4 w-4 text-red-500" />
@@ -123,9 +123,9 @@ export function ExpenseSummary({ expenses }: ExpenseSummaryProps) {
       </Card>
 
       <Card
-        className={
-          summary.isSavingEnough ? "border-green-500 dark:border-green-700" : "border-amber-500 dark:border-amber-700"
-        }
+        className={`overflow-hidden hover:shadow-md transition-shadow border-t-4 ${
+          summary.isSavingEnough ? "border-t-blue-500" : "border-t-amber-500"
+        }`}
       >
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Savings</CardTitle>
@@ -179,10 +179,13 @@ export function ExpenseSummary({ expenses }: ExpenseSummaryProps) {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="overflow-hidden hover:shadow-md transition-shadow border-t-4 border-t-purple-500">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Balance</CardTitle>
-          <div className={`h-4 w-4 rounded-full ${summary.balance >= 0 ? "bg-green-500" : "bg-red-500"}`} />
+          <div className="flex items-center">
+            <WalletIcon className="h-4 w-4 text-purple-500" />
+            <div className={`ml-1 h-3 w-3 rounded-full ${summary.balance >= 0 ? "bg-green-500" : "bg-red-500"}`} />
+          </div>
         </CardHeader>
         <CardContent>
           <div className={`text-2xl font-bold ${summary.balance >= 0 ? "text-green-600" : "text-red-600"}`}>

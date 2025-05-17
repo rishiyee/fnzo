@@ -18,9 +18,20 @@ const dispatchTemplateEvent = (eventName: string, template: TransactionTemplate)
   }
 }
 
-// Helper function to handle Supabase rate limiting
-const handleRateLimiting = async (retryCount: number): Promise<void> => {
-  // Exponential backoff with jitter
+// Helper function to handle Supabase rate limiting with exponential backoff
+const handleRateLimiting = async (retryCount: number, retryAfterHeader?: string | null): Promise<void> => {
+  // If we have a Retry-After header, use that value (in seconds)
+  if (retryAfterHeader) {
+    const retryAfterSeconds = Number.parseInt(retryAfterHeader, 10)
+    if (!isNaN(retryAfterSeconds) && retryAfterSeconds > 0) {
+      const delayMs = retryAfterSeconds * 1000
+      console.log(`Rate limited. Waiting ${delayMs}ms as specified by Retry-After header`)
+      await new Promise((resolve) => setTimeout(resolve, delayMs))
+      return
+    }
+  }
+
+  // Otherwise use exponential backoff with jitter
   const baseDelay = Math.pow(2, retryCount) * 1000 // 2s, 4s, 8s, 16s
   const jitter = Math.random() * 1000 // Add up to 1s of random jitter
   const delay = baseDelay + jitter
@@ -69,55 +80,41 @@ export const templateService = {
             await handleRateLimiting(retryCount)
           }
 
-          // Use a lower-level fetch approach to better handle rate limiting
-          const { data: sessionData } = await supabase.auth.getSession()
-          const token = sessionData.session?.access_token
+          // Use the Supabase client directly instead of fetch
+          const { data, error, status } = await supabase
+            .from("transaction_templates")
+            .select("*")
+            .order("name", { ascending: true })
 
-          if (!token) {
-            throw new Error("No authentication token available")
-          }
+          // Handle rate limiting error specifically
+          if (error && status === 429) {
+            console.warn("Rate limited by Supabase API:", error.message)
+            retryCount++
 
-          const apiUrl = `${supabase.supabaseUrl}/rest/v1/transaction_templates?order=name.asc`
-
-          const response = await fetch(apiUrl, {
-            method: "GET",
-            headers: {
-              apikey: supabase.supabaseKey,
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-              Prefer: "return=representation",
-            },
-            cache: "no-store",
-          })
-
-          // Handle HTTP errors explicitly
-          if (!response.ok) {
-            const statusText = response.statusText
-            const status = response.status
-
-            // Handle rate limiting specifically
-            if (status === 429) {
-              console.warn("Rate limited by Supabase API")
-
-              // Get retry-after header if available
-              const retryAfter = response.headers.get("Retry-After")
-              const retryMs = retryAfter ? Number.parseInt(retryAfter) * 1000 : undefined
-
-              if (retryMs) {
-                console.log(`Waiting ${retryMs}ms as specified by Retry-After header`)
-                await new Promise((resolve) => setTimeout(resolve, retryMs))
-              } else {
-                retryCount++
-                continue // Skip to next retry with backoff
+            // If we've reached max retries, use cache or return empty array
+            if (retryCount >= maxRetries) {
+              console.error("Max retries reached for rate limiting")
+              if (templatesCache) {
+                console.log("Returning stale cache due to rate limiting")
+                return templatesCache
               }
+              return []
             }
 
-            throw new Error(`API request failed: ${status} ${statusText}`)
+            // Otherwise retry with backoff
+            continue
           }
 
-          // Safely parse the JSON response
-          const responseText = await response.text()
-          const data = safeJsonParse(responseText)
+          // Handle other errors
+          if (error) {
+            throw new Error(`Supabase error: ${error.message}`)
+          }
+
+          // Ensure data is an array
+          if (!Array.isArray(data)) {
+            console.error("Expected array but got:", typeof data, data)
+            return []
+          }
 
           // Map database templates to app templates
           const templates: TransactionTemplate[] = data.map((template: any) => ({
@@ -147,13 +144,20 @@ export const templateService = {
             continue
           }
 
-          // On last retry, throw the error
-          throw error
+          // On last retry, use cache or return empty array
+          if (templatesCache) {
+            console.log("Returning stale cache due to error")
+            return templatesCache
+          }
+          return []
         }
       }
 
-      // This should never be reached due to the throw in the loop
-      throw lastError
+      // This should never be reached due to the returns in the loop
+      if (templatesCache) {
+        return templatesCache
+      }
+      return []
     } catch (error) {
       console.error("Error in getTemplates:", error)
 
@@ -200,7 +204,7 @@ export const templateService = {
           }
 
           // Create template in database
-          const { data, error } = await supabase
+          const { data, error, status } = await supabase
             .from("transaction_templates")
             .insert({
               user_id: userId,
@@ -213,6 +217,13 @@ export const templateService = {
             })
             .select()
             .single()
+
+          // Handle rate limiting specifically
+          if (error && status === 429) {
+            console.warn("Rate limited during template creation")
+            retryCount++
+            continue
+          }
 
           if (error) {
             throw error
@@ -240,14 +251,6 @@ export const templateService = {
           return template
         } catch (error: any) {
           lastError = error
-
-          // Check if it's a rate limiting error
-          if (error.message && error.message.includes("Too many requests")) {
-            console.warn("Rate limited during template creation")
-            retryCount++
-            continue
-          }
-
           retryCount++
 
           if (retryCount < maxRetries) {
@@ -289,7 +292,7 @@ export const templateService = {
           }
 
           // Update template in database
-          const { data, error } = await supabase
+          const { data, error, status } = await supabase
             .from("transaction_templates")
             .update({
               name: input.name,
@@ -303,6 +306,13 @@ export const templateService = {
             .eq("id", id)
             .select()
             .single()
+
+          // Handle rate limiting specifically
+          if (error && status === 429) {
+            console.warn("Rate limited during template update")
+            retryCount++
+            continue
+          }
 
           if (error) {
             throw error
@@ -330,14 +340,6 @@ export const templateService = {
           return template
         } catch (error: any) {
           lastError = error
-
-          // Check if it's a rate limiting error
-          if (error.message && error.message.includes("Too many requests")) {
-            console.warn("Rate limited during template update")
-            retryCount++
-            continue
-          }
-
           retryCount++
 
           if (retryCount < maxRetries) {
@@ -380,11 +382,18 @@ export const templateService = {
           }
 
           // Get template before deletion for event
-          const { data, error: fetchError } = await supabase
-            .from("transaction_templates")
-            .select("*")
-            .eq("id", id)
-            .single()
+          const {
+            data,
+            error: fetchError,
+            status: fetchStatus,
+          } = await supabase.from("transaction_templates").select("*").eq("id", id).single()
+
+          // Handle rate limiting specifically
+          if (fetchError && fetchStatus === 429) {
+            console.warn("Rate limited during template fetch before deletion")
+            retryCount++
+            continue
+          }
 
           if (fetchError) {
             throw fetchError
@@ -393,7 +402,17 @@ export const templateService = {
           templateData = data
 
           // Delete template from database
-          const { error: deleteError } = await supabase.from("transaction_templates").delete().eq("id", id)
+          const { error: deleteError, status: deleteStatus } = await supabase
+            .from("transaction_templates")
+            .delete()
+            .eq("id", id)
+
+          // Handle rate limiting specifically
+          if (deleteError && deleteStatus === 429) {
+            console.warn("Rate limited during template deletion")
+            retryCount++
+            continue
+          }
 
           if (deleteError) {
             throw deleteError
@@ -421,14 +440,6 @@ export const templateService = {
           return
         } catch (error: any) {
           lastError = error
-
-          // Check if it's a rate limiting error
-          if (error.message && error.message.includes("Too many requests")) {
-            console.warn("Rate limited during template deletion")
-            retryCount++
-            continue
-          }
-
           retryCount++
 
           if (retryCount < maxRetries) {
