@@ -22,6 +22,8 @@ import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import type { ExpenseType } from "@/types/expense"
 import { expenseService } from "@/lib/expense-service"
+import { motion, AnimatePresence } from "framer-motion"
+import { FilterPresets } from "@/components/filter-presets"
 
 interface UnifiedFilterProps {
   className?: string
@@ -125,28 +127,61 @@ export function UnifiedFilter({ className, compact = false }: UnifiedFilterProps
         label = `${format(filters.customDateFrom, "MMM d")} - ${format(filters.customDateTo, "MMM d")}`
       }
       activeFilters.push(
-        <Badge key="time" variant="outline" className="mr-1 mb-1">
-          <CalendarDays className="mr-1 h-3 w-3" />
-          {label}
-        </Badge>,
+        <motion.div
+          key="time"
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.8 }}
+          transition={{ duration: 0.2 }}
+        >
+          <Badge
+            variant="outline"
+            className="mr-1 mb-1 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
+          >
+            <CalendarDays className="mr-1 h-3 w-3 text-blue-500" />
+            {label}
+          </Badge>
+        </motion.div>,
       )
     }
 
     if (filters.type !== "all") {
       activeFilters.push(
-        <Badge key="type" variant="outline" className="mr-1 mb-1">
-          <PiggyBank className="mr-1 h-3 w-3" />
-          {filters.type.charAt(0).toUpperCase() + filters.type.slice(1)}
-        </Badge>,
+        <motion.div
+          key="type"
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.8 }}
+          transition={{ duration: 0.2, delay: 0.05 }}
+        >
+          <Badge
+            variant="outline"
+            className="mr-1 mb-1 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
+          >
+            <PiggyBank className="mr-1 h-3 w-3 text-green-500" />
+            {filters.type.charAt(0).toUpperCase() + filters.type.slice(1)}
+          </Badge>
+        </motion.div>,
       )
     }
 
     if (filters.category !== "all") {
       activeFilters.push(
-        <Badge key="category" variant="outline" className="mr-1 mb-1">
-          <ArrowDownUp className="mr-1 h-3 w-3" />
-          {filters.category}
-        </Badge>,
+        <motion.div
+          key="category"
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.8 }}
+          transition={{ duration: 0.2, delay: 0.1 }}
+        >
+          <Badge
+            variant="outline"
+            className="mr-1 mb-1 bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800"
+          >
+            <ArrowDownUp className="mr-1 h-3 w-3 text-purple-500" />
+            {filters.category}
+          </Badge>
+        </motion.div>,
       )
     }
 
@@ -158,46 +193,92 @@ export function UnifiedFilter({ className, compact = false }: UnifiedFilterProps
         label = `${min} - ${max}`
       }
       activeFilters.push(
-        <Badge key="amount" variant="outline" className="mr-1 mb-1">
-          <CircleDollarSign className="mr-1 h-3 w-3" />
-          {label}
-        </Badge>,
+        <motion.div
+          key="amount"
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.8 }}
+          transition={{ duration: 0.2, delay: 0.15 }}
+        >
+          <Badge
+            variant="outline"
+            className="mr-1 mb-1 bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800"
+          >
+            <CircleDollarSign className="mr-1 h-3 w-3 text-amber-500" />
+            {label}
+          </Badge>
+        </motion.div>,
       )
     }
 
     return (
-      <div className="flex flex-wrap mt-2">
-        {activeFilters}
-        {activeFilters.length > 0 && (
-          <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={resetFilters}>
-            <X className="mr-1 h-3 w-3" /> Clear
-          </Button>
-        )}
-      </div>
+      <motion.div
+        className="flex flex-wrap mt-2"
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
+        <AnimatePresence>
+          {activeFilters}
+          {activeFilters.length > 0 && (
+            <motion.div
+              key="clear"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.2, delay: 0.2 }}
+            >
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
+                onClick={resetFilters}
+              >
+                <X className="mr-1 h-3 w-3" /> Clear
+              </Button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
     )
   }
 
   return (
     <div className={cn("space-y-2 w-full", className)}>
-      <div className="flex items-center gap-2 flex-wrap w-full">
+      <motion.div
+        className="flex items-center gap-2 flex-wrap w-full p-2 rounded-lg bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm border border-gray-100 dark:border-gray-800 shadow-sm"
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
+        {/* Filter Presets */}
+        <FilterPresets />
+
         {/* Time Period Filter */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               variant="outline"
               size={compact ? "sm" : "default"}
-              className={cn(filters.timePeriod !== "all" && "border-primary bg-primary/10", "gap-1")}
+              className={cn(
+                filters.timePeriod !== "all" &&
+                  "border-blue-400 bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800",
+                "gap-1 transition-all duration-200 hover:shadow-md",
+              )}
             >
               <CalendarDays className={cn("h-4 w-4", compact && "h-3.5 w-3.5")} />
               <span>{compact ? "" : timePeriodLabels[filters.timePeriod]}</span>
               {compact && filters.timePeriod !== "all" && (
-                <Badge variant="secondary" className="h-5 ml-1 px-1.5 text-xs">
+                <Badge
+                  variant="secondary"
+                  className="h-5 ml-1 px-1.5 text-xs bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300"
+                >
                   •
                 </Badge>
               )}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-52">
+          <DropdownMenuContent className="w-52 animate-in fade-in-80 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2">
             <DropdownMenuLabel>Time Period</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuRadioGroup
@@ -271,7 +352,11 @@ export function UnifiedFilter({ className, compact = false }: UnifiedFilterProps
             <Button
               variant="outline"
               size={compact ? "sm" : "default"}
-              className={cn(filters.type !== "all" && "border-primary bg-primary/10", "gap-1")}
+              className={cn(
+                filters.type !== "all" &&
+                  "border-green-400 bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800",
+                "gap-1 transition-all duration-200 hover:shadow-md",
+              )}
             >
               <PiggyBank className={cn("h-4 w-4", compact && "h-3.5 w-3.5")} />
               <span>
@@ -282,13 +367,16 @@ export function UnifiedFilter({ className, compact = false }: UnifiedFilterProps
                     : filters.type.charAt(0).toUpperCase() + filters.type.slice(1)}
               </span>
               {compact && filters.type !== "all" && (
-                <Badge variant="secondary" className="h-5 ml-1 px-1.5 text-xs">
+                <Badge
+                  variant="secondary"
+                  className="h-5 ml-1 px-1.5 text-xs bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300"
+                >
                   •
                 </Badge>
               )}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent>
+          <DropdownMenuContent className="animate-in fade-in-80 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2">
             <DropdownMenuLabel>Transaction Type</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuRadioGroup
@@ -309,18 +397,25 @@ export function UnifiedFilter({ className, compact = false }: UnifiedFilterProps
             <Button
               variant="outline"
               size={compact ? "sm" : "default"}
-              className={cn(filters.category !== "all" && "border-primary bg-primary/10", "gap-1")}
+              className={cn(
+                filters.category !== "all" &&
+                  "border-purple-400 bg-purple-50 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-800",
+                "gap-1 transition-all duration-200 hover:shadow-md",
+              )}
             >
               <ArrowDownUp className={cn("h-4 w-4", compact && "h-3.5 w-3.5")} />
               <span>{compact ? "" : filters.category === "all" ? "All Categories" : filters.category}</span>
               {compact && filters.category !== "all" && (
-                <Badge variant="secondary" className="h-5 ml-1 px-1.5 text-xs">
+                <Badge
+                  variant="secondary"
+                  className="h-5 ml-1 px-1.5 text-xs bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-300"
+                >
                   •
                 </Badge>
               )}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="max-h-[300px] overflow-y-auto">
+          <DropdownMenuContent className="max-h-[300px] overflow-y-auto animate-in fade-in-80 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2">
             <DropdownMenuLabel>Category</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuRadioGroup value={filters.category} onValueChange={(value) => setCategory(value)}>
@@ -341,18 +436,25 @@ export function UnifiedFilter({ className, compact = false }: UnifiedFilterProps
             <Button
               variant="outline"
               size={compact ? "sm" : "default"}
-              className={cn(filters.amountRange !== "all" && "border-primary bg-primary/10", "gap-1")}
+              className={cn(
+                filters.amountRange !== "all" &&
+                  "border-amber-400 bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800",
+                "gap-1 transition-all duration-200 hover:shadow-md",
+              )}
             >
               <CircleDollarSign className={cn("h-4 w-4", compact && "h-3.5 w-3.5")} />
               <span>{compact ? "" : amountRangeLabels[filters.amountRange]}</span>
               {compact && filters.amountRange !== "all" && (
-                <Badge variant="secondary" className="h-5 ml-1 px-1.5 text-xs">
+                <Badge
+                  variant="secondary"
+                  className="h-5 ml-1 px-1.5 text-xs bg-amber-100 text-amber-600 dark:bg-amber-900 dark:text-amber-300"
+                >
                   •
                 </Badge>
               )}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-52">
+          <DropdownMenuContent className="w-52 animate-in fade-in-80 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2">
             <DropdownMenuLabel>Amount Range</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuRadioGroup
@@ -422,7 +524,10 @@ export function UnifiedFilter({ className, compact = false }: UnifiedFilterProps
             size={compact ? "sm" : "default"}
             onClick={resetFilters}
             disabled={isDefaultFilter}
-            className="gap-1"
+            className={cn(
+              "gap-1 transition-all duration-200",
+              !isDefaultFilter && "hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20",
+            )}
           >
             <X className={cn("h-4 w-4", compact && "h-3.5 w-3.5")} />
             <span>{compact ? "" : "Reset"}</span>
@@ -431,14 +536,20 @@ export function UnifiedFilter({ className, compact = false }: UnifiedFilterProps
 
         {/* Active Filter Count Badge */}
         {!compact && activeFilterCount > 0 && (
-          <Badge variant="secondary" className="ml-1">
-            {activeFilterCount} active {activeFilterCount === 1 ? "filter" : "filters"}
-          </Badge>
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Badge variant="secondary" className="ml-1 bg-gradient-to-r from-blue-500 to-purple-500 text-white">
+              {activeFilterCount} active {activeFilterCount === 1 ? "filter" : "filters"}
+            </Badge>
+          </motion.div>
         )}
-      </div>
+      </motion.div>
 
       {/* Active Filter Pills (for compact view) */}
-      {compact && renderActiveFilters()}
+      <AnimatePresence>{compact && renderActiveFilters()}</AnimatePresence>
     </div>
   )
 }
